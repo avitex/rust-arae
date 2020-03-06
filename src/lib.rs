@@ -4,8 +4,7 @@
 //! ```rust
 //! use carousel::Ring;
 //!
-//! // Create a new `Ring` with the elements
-//! // initialized via `Default::default`.
+//! // Create a new `Ring` with the elements initialized via `Default::default`.
 //! let mut ring = Ring::new_with_default(10);
 //!
 //! // Create two cursors pointing the the head of the ring.
@@ -20,6 +19,7 @@
 #![no_std]
 
 mod cur;
+mod iter;
 
 extern crate alloc;
 
@@ -31,6 +31,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 pub use self::cur::Cursor;
+pub use self::iter::Iter;
 
 #[cfg(feature = "atomic")]
 pub use self::cur::AtomicCursor;
@@ -131,6 +132,7 @@ impl<T: Default> Ring<T> {
     }
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl<T> Ring<T> {
     /// Construct a `Ring` from its raw parts.
     ///
@@ -149,9 +151,13 @@ impl<T> Ring<T> {
         self.len
     }
 
+    /// Returns a cursor at the given offset from the head of the ring.
+    ///
+    /// # Panics
+    /// Panics if `offset > Ring::len()`.
     #[inline]
     pub fn at(&self, offset: usize) -> Cursor<T> {
-        unimplemented!()
+        Cursor::new(self.elem_offset_ptr(offset))
     }
 
     #[inline]
@@ -164,6 +170,16 @@ impl<T> Ring<T> {
         Cursor::new(self.get_tail_ptr())
     }
 
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, T> {
+        Iter::new(self, self.head())
+    }
+
+    #[inline]
+    pub fn iter_from(&self, offset: usize) -> Iter<'_, T> {
+        Iter::new(self, self.at(offset))
+    }
+
     /// Returns a reference to the element at the given cursor in the ring.
     ///
     /// # Panics
@@ -171,7 +187,7 @@ impl<T> Ring<T> {
     #[inline]
     pub fn get(&self, cursor: Cursor<T>) -> &T {
         self.assert_in_bounds(cursor);
-        unimplemented!()
+        unsafe { &*cursor.ptr().as_ptr() }
     }
 
     /// Returns a mutable reference to the element at the given cursor in the ring.
@@ -181,7 +197,7 @@ impl<T> Ring<T> {
     #[inline]
     pub fn get_mut(&mut self, cursor: Cursor<T>) -> &mut T {
         self.assert_in_bounds(cursor);
-        unimplemented!()
+        unsafe { &mut *cursor.ptr().as_ptr() }
     }
 
     #[inline]
@@ -247,20 +263,23 @@ impl<T> Ring<T> {
     }
 
     #[inline]
-    fn size(&self) -> isize {
-        // Vec/Box ensures it nevers allocates more than isize::MAX bytes.
-        (mem::size_of::<T>() * self.len) as isize
-    }
-
-    #[inline]
     fn get_ptr_bounds(&self) -> (NonNull<T>, NonNull<T>) {
         (self.get_head_ptr(), self.get_tail_ptr())
     }
 
     #[inline]
     fn get_tail_ptr(&self) -> NonNull<T> {
+        self.elem_offset_ptr(self.len)
+    }
+
+    #[inline]
+    fn elem_offset_ptr(&self, offset: usize) -> NonNull<T> {
+        assert!(offset <= self.len);
+        // Vec/Box ensures nevers allocates more than isize::MAX bytes so
+        // this cast is safe.
+        let byte_offset = (offset * mem::size_of::<T>()) as isize;
         unsafe {
-            let ptr = self.get_head_ptr().as_ptr().offset(self.size());
+            let ptr = self.get_head_ptr().as_ptr().offset(byte_offset);
             NonNull::new_unchecked(ptr)
         }
     }
@@ -295,6 +314,10 @@ impl<T: Clone> Clone for Ring<T> {
             let ptr = boxed_slice_clone.as_mut_ptr();
             let len = boxed_slice_clone.len();
 
+            // now forget about the cloned box for the same
+            // reason as above!
+            mem::forget(boxed_slice_clone);
+
             // we just cloned valid data... this is tots fine.
             let ptr = NonNull::new_unchecked(ptr);
 
@@ -311,50 +334,26 @@ impl<T> Drop for Ring<T> {
     }
 }
 
-/// A `Ring` element `Iterator` that returns a reference to the
-/// element and a `Cursor` that points to it.
-pub struct Iter<'a, T> {
-    cur: Cursor<T>,
-    ring: &'a Ring<T>,
-}
-
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = (&'a T, Cursor<T>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.cur = self.ring.advance(self.cur);
-        let elem = self.ring.get(self.cur);
-        Some((elem, self.cur))
+impl<TL, TR> PartialEq<Ring<TR>> for Ring<TL>
+where
+    TL: PartialEq<TR>,
+{
+    fn eq(&self, other: &Ring<TR>) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+        let zipped_elems = self.iter().zip(other.iter());
+        for ((left_elem, cur), (right_elem, _)) in zipped_elems {
+            if left_elem.ne(right_elem) {
+                return false;
+            }
+            if self.is_head(cur) {
+                break;
+            }
+        }
+        true
     }
 }
-
-// /// A `Ring` element `Iterator` that returns a mutable reference to the
-// /// element and a `Cursor` that points to it.
-// pub struct IterMut<'a, T> {
-//     cur: Cursor<T>,
-//     ring: &'a mut Ring<T>,
-// }
-
-// impl<'a, T> Iterator for IterMut<'a, T> {
-//     type Item = (&'a mut T, Cursor<T>);
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         self.cur = self.ring.advance(self.cur);
-//         let elem = self.ring.get_mut(self.cur);
-//         Some((elem, self.cur))
-//     }
-// }
-
-// impl<TL, TR> PartialEq<Ring<TR>> for Ring<TL> {
-//     fn eq(&self, other: &Ring<TR>) -> bool {
-//         if self.len() != other.len() {
-//             return false;
-//         }
-//         let cursor_right = other.cursor();
-//         let cursor_left = self.cursor();
-//         for _ in self.
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
@@ -371,12 +370,10 @@ mod tests {
         Ring::<u8>::new_with_default(0);
     }
 
-    // #[test]
-    // fn test_ring_clone() {
-    //     let ring = Ring::<u8>::new_with_init(1, || 66);
-    //     let ring_clone = ring.clone();
-
-    //     for
-
-    // }
+    #[test]
+    fn test_ring_clone() {
+        let ring = Ring::<u8>::new_with_init(1, || 66);
+        let ring_clone = ring.clone();
+        assert_eq!(ring, ring_clone);
+    }
 }
