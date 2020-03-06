@@ -50,7 +50,7 @@ impl<T> AtomicCursor<T> {
     /// # Panics
     /// Panics if the ring does not own the cursor.
     #[inline]
-    pub fn next(&self, ring: &Ring<T>, order: Ordering) {
+    pub fn prev(&self, ring: &Ring<T>, order: Ordering) {
         let cursor = self.load(order);
         let cursor = ring.prev(cursor);
         self.store(cursor, order);

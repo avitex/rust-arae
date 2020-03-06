@@ -147,20 +147,6 @@ impl<T: Default> Ring<T> {
 
 #[allow(clippy::len_without_is_empty)]
 impl<T> Ring<T> {
-    /// Construct a new `Ring` from its raw parts.
-    ///
-    /// # Safety
-    /// Has the same safety constraints and notes as [`slice::from_raw_parts`].
-    ///
-    /// [`slice::from_raw_parts`]: https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html
-    #[inline]
-    pub unsafe fn from_raw_parts(head_ptr: NonNull<T>, len: usize) -> Self {
-        debug_assert!(len <= isize::max_value() as usize);
-        let head = head_ptr;
-        let tail = NonNull::new_unchecked(head.as_ptr().add(len - 1));
-        Self { head, tail }
-    }
-
     /// Returns the length of the ring.
     #[inline]
     pub fn len(&self) -> usize {
@@ -395,6 +381,27 @@ impl<T> Ring<T> {
         Iter::new(self, self.at(offset))
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    // private
+
+    /// Construct a new `Ring` from its raw parts.
+    /// 
+    /// # Panics
+    /// Panics if `len` is zero or greater than `isize::max_value()`.
+    ///
+    /// # Safety
+    /// Has the same safety constraints and notes as [`slice::from_raw_parts`].
+    ///
+    /// [`slice::from_raw_parts`]: https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html
+    #[inline]
+    unsafe fn from_raw_parts(head_ptr: NonNull<T>, len: usize) -> Self {
+        assert_ne!(len, 0);
+        assert!(len <= isize::max_value() as usize);
+        let head = head_ptr;
+        let tail = NonNull::new_unchecked(head.as_ptr().add(len - 1));
+        Self { head, tail }
+    }
+
     #[inline]
     fn assert_in_bounds(&self, cursor: Cursor<T>) {
         assert!(self.is_owner(cursor));
@@ -403,8 +410,6 @@ impl<T> Ring<T> {
     #[inline]
     fn head_offset_ptr(&self, offset: usize) -> NonNull<T> {
         assert!(offset < self.len());
-        extern crate std;
-        std::dbg!(offset);
         unsafe {
             let offset_ptr = self.head.as_ptr().add(offset);
             NonNull::new_unchecked(offset_ptr)
