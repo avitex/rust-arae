@@ -34,7 +34,7 @@ impl<T> AtomicCursor<T> {
         self.ptr.store(cursor.ptr().as_ptr(), order);
     }
 
-    /// Atomically advance the cursor given it's owning ring.
+    /// Atomically advance the cursor given its owning ring.
     ///
     /// # Panics
     /// Panics if the ring does not own the cursor.
@@ -42,6 +42,17 @@ impl<T> AtomicCursor<T> {
     pub fn next(&self, ring: &Ring<T>, order: Ordering) {
         let cursor = self.load(order);
         let cursor = ring.next(cursor);
+        self.store(cursor, order);
+    }
+
+    /// Atomically reverse the cursor given its owning ring.
+    ///
+    /// # Panics
+    /// Panics if the ring does not own the cursor.
+    #[inline]
+    pub fn next(&self, ring: &Ring<T>, order: Ordering) {
+        let cursor = self.load(order);
+        let cursor = ring.prev(cursor);
         self.store(cursor, order);
     }
 }
