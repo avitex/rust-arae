@@ -2,7 +2,7 @@
 [![Crate](https://img.shields.io/crates/v/carousel.svg)](https://crates.io/crates/carousel)
 [![Docs](https://docs.rs/carousel/badge.svg)](https://docs.rs/carousel)
 
-# carousel
+# rust-carousel
 
 **A cyclic data structure in contiguous memory**  
 Documentation hosted on [docs.rs](https://docs.rs/carousel).
