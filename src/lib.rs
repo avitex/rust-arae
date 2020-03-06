@@ -239,9 +239,9 @@ impl<T> Ring<T> {
     ///
     /// let ring: Ring<_> = vec![1, 2, 3].into();
     ///
-    /// let cursor = ring.next(ring.head());
+    /// let cursor = ring.next(ring.tail());
     ///
-    /// assert_eq!(*ring.get(cursor), 2);
+    /// assert_eq!(*ring.get(cursor), 1);
     /// ```
     ///
     /// # Panics
@@ -268,6 +268,48 @@ impl<T> Ring<T> {
 
         // return the advanced cursor.
         next_cursor
+    }
+
+    /// Given a cursor, return its previous element step through the ring.
+    ///
+    /// If the cursor provided points to the head, the cursor returned
+    /// will wrap and point to the tail of the ring.
+    ///
+    /// # Example
+    /// ```rust
+    /// use carousel::Ring;
+    ///
+    /// let ring: Ring<_> = vec![1, 2, 3].into();
+    ///
+    /// let cursor = ring.prev(ring.head());
+    ///
+    /// assert_eq!(*ring.get(cursor), 3);
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if the ring does not own the cursor.
+    #[inline]
+    // NOTE: we assume the cursor given to us is valid and
+    // check it after our advance operation (see sanity check).
+    pub fn prev(&self, cursor: Cursor<T>) -> Cursor<T> {
+        // get the current cursor ptr.
+        let cursor_ptr = cursor.ptr();
+
+        // wrap the cursor ptr if currently at the ring head.
+        let prev_cursor = if cursor_ptr == self.head {
+            Cursor::new(self.tail)
+        } else {
+            unsafe {
+                let ptr = cursor_ptr.as_ptr().sub(1);
+                Cursor::new_unchecked(ptr)
+            }
+        };
+
+        // sanity check.
+        self.assert_in_bounds(prev_cursor);
+
+        // return the reversed cursor.
+        prev_cursor
     }
 
     /// Returns the element offset at the given cursor in the ring.
