@@ -23,7 +23,6 @@ impl<T> Cursor<T> {
 
     /// Constructs new cursor given a unchecked pointer.
     #[inline]
-    #[allow(dead_code)]
     pub(crate) unsafe fn new_unchecked(ptr: *mut T) -> Self {
         Self::new(NonNull::new_unchecked(ptr))
     }
