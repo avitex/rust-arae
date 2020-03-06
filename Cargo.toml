@@ -6,5 +6,8 @@ edition = "2018"
 
 [features]
 
-default = ["atomic"]
+default = []
 atomic = []
+
+[dev-dependencies]
+# loom = "0.2"

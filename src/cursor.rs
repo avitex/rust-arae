@@ -1,11 +1,8 @@
-use core::cmp;
-use core::marker::PhantomData;
 use core::ptr::NonNull;
-
-use crate::Ring;
+use core::{cmp, fmt};
 
 #[cfg(feature = "atomic")]
-use core::sync::atomic::{AtomicPtr, Ordering};
+use crate::atomic::AtomicCursor;
 
 /// An opaque structure that represents a location within a `Ring`.
 ///
@@ -26,6 +23,7 @@ impl<T> Cursor<T> {
 
     /// Constructs new cursor given a unchecked pointer.
     #[inline]
+    #[allow(dead_code)]
     pub(crate) unsafe fn new_unchecked(ptr: *mut T) -> Self {
         Self::new(NonNull::new_unchecked(ptr))
     }
@@ -73,46 +71,8 @@ impl<T> Ord for Cursor<T> {
     }
 }
 
-#[cfg(feature = "atomic")]
-pub struct AtomicCursor<T> {
-    ptr: AtomicPtr<T>,
-    marker: PhantomData<T>,
-}
-
-#[cfg(feature = "atomic")]
-impl<T> AtomicCursor<T> {
-    /// Constructs new atomic cursor given a `Cursor`.
-    #[inline]
-    pub fn new(cursor: Cursor<T>) -> Self {
-        let ptr = AtomicPtr::new(cursor.ptr().as_ptr());
-        Self {
-            ptr,
-            marker: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub fn load(&self, order: Ordering) -> Cursor<T> {
-        let ptr = self.ptr.load(order);
-        unsafe { Cursor::new_unchecked(ptr) }
-    }
-
-    #[inline]
-    pub fn store(&self, cursor: Cursor<T>, order: Ordering) {
-        self.ptr.store(cursor.ptr().as_ptr(), order);
-    }
-
-    #[inline]
-    pub fn advance(&self, ring: &Ring<T>, order: Ordering) {
-        let cursor = self.load(order);
-        let cursor = ring.advance(cursor);
-        self.store(cursor, order);
-    }
-}
-
-#[cfg(feature = "atomic")]
-impl<T> From<Cursor<T>> for AtomicCursor<T> {
-    fn from(cursor: Cursor<T>) -> Self {
-        cursor.into_atomic()
+impl<T> fmt::Debug for Cursor<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Cursor({:?})", self.ptr)
     }
 }
