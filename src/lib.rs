@@ -6,13 +6,14 @@
     rust_2018_idioms
 )]
 
-//! Provides the heap allocated circular `Ring` and associated `Cursor` structures.
+//! Provides the heap allocated cyclic `Ring` and associated `Cursor` structures.
 //!
 //! # Example
 //! ```rust
 //! use carousel::Ring;
 //!
-//! // Create a new `Ring` with the elements initialized via `Default::default`.
+//! // Create a new `Ring` of length 10 with the elements
+//! // initialized via `Default::default`.
 //! let mut ring = Ring::new_with_default(10);
 //!
 //! // Create two cursors pointing the the head of the ring.
@@ -43,7 +44,7 @@ pub use self::atomic::AtomicCursor;
 pub use self::cursor::Cursor;
 pub use self::iter::Iter;
 
-/// A `Ring` is a circular structure of values in contiguous memory.
+/// A `Ring` is a cyclic structure of values in contiguous memory.
 ///
 /// Elements within a `Ring` are accessed via `Cursor`s.
 pub struct Ring<T> {
