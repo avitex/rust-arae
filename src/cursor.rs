@@ -32,6 +32,7 @@ impl<T> Cursor<T> {
         self.ptr
     }
 
+    /// Converts the cursor into the atomic variant.
     #[cfg(feature = "atomic")]
     #[inline]
     pub fn into_atomic(self) -> AtomicCursor<T> {
