@@ -239,7 +239,7 @@ impl<T> Ring<T> {
     ///
     /// let ring: Ring<_> = vec![1, 2, 3].into();
     ///
-    /// let cursor = ring.advance(ring.head());
+    /// let cursor = ring.next(ring.head());
     ///
     /// assert_eq!(*ring.get(cursor), 2);
     /// ```
@@ -249,7 +249,7 @@ impl<T> Ring<T> {
     #[inline]
     // NOTE: we assume the cursor given to us is valid and
     // check it after our advance operation (see sanity check).
-    pub fn advance(&self, cursor: Cursor<T>) -> Cursor<T> {
+    pub fn next(&self, cursor: Cursor<T>) -> Cursor<T> {
         // get the current cursor ptr.
         let cursor_ptr = cursor.ptr();
 
@@ -360,6 +360,8 @@ impl<T> Ring<T> {
     #[inline]
     fn head_offset_ptr(&self, offset: usize) -> NonNull<T> {
         assert!(offset < self.len());
+        extern crate std;
+        std::dbg!(offset);
         unsafe {
             let offset_ptr = self.head.as_ptr().add(offset);
             NonNull::new_unchecked(offset_ptr)
@@ -473,13 +475,13 @@ mod tests {
 
         assert_eq!(*ring.get(cursor), 1);
 
-        let cursor = ring.advance(cursor);
+        let cursor = ring.next(cursor);
         assert_eq!(*ring.get(cursor), 2);
 
-        let cursor = ring.advance(cursor);
+        let cursor = ring.next(cursor);
         assert_eq!(*ring.get(cursor), 3);
 
-        let cursor = ring.advance(cursor);
+        let cursor = ring.next(cursor);
         assert_eq!(*ring.get(cursor), 1);
     }
 
@@ -498,18 +500,35 @@ mod tests {
     }
 
     #[test]
+    fn test_ring_iter_from_zero() {
+        let ring: Ring<_> = vec![1, 2].into();
+        let mut ring_iter = ring.iter_from(0);
+
+        let (_, cursor) = ring_iter.next().unwrap();
+        assert_eq!(*ring.get(cursor), 1);
+        assert_eq!(ring.offset(cursor), 0);
+
+        let (_, cursor) = ring_iter.next().unwrap();
+        assert_eq!(*ring.get(cursor), 2);
+        assert_eq!(ring.offset(cursor), 1);
+        assert!(ring.is_tail(cursor));
+
+        let (_, cursor) = ring_iter.next().unwrap();
+        assert_eq!(ring.offset(cursor), 0);
+    }
+
+    #[test]
     fn test_ring_iter_from() {
         let ring: Ring<_> = vec![1, 2].into();
         let mut ring_iter = ring.iter_from(1);
 
         let (_, cursor) = ring_iter.next().unwrap();
-        assert_eq!(ring.offset(cursor), 0);
-
-        let (_, cursor) = ring_iter.next().unwrap();
+        assert_eq!(*ring.get(cursor), 2);
         assert_eq!(ring.offset(cursor), 1);
         assert!(ring.is_tail(cursor));
 
         let (_, cursor) = ring_iter.next().unwrap();
+        assert_eq!(*ring.get(cursor), 1);
         assert_eq!(ring.offset(cursor), 0);
     }
 

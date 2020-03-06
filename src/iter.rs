@@ -19,26 +19,31 @@ impl<'a, T> Iterator for Iter<'a, T> {
     type Item = (&'a T, Cursor<T>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.cur = self.ring.advance(self.cur);
-        let elem = self.ring.get(self.cur);
-        Some((elem, self.cur))
+        let curr_cursor = self.cur;
+        self.cur = self.ring.next(curr_cursor);
+        let elem = self.ring.get(curr_cursor);
+        Some((elem, curr_cursor))
     }
 }
 
-// TODO: impl
-// /// A `Ring` element `Iterator` that returns a mutable reference to the
-// /// element and a `Cursor` that points to it.
-// pub struct IterMut<'a, T> {
-//     cur: Cursor<T>,
-//     ring: &'a mut Ring<T>,
-// }
+/// A `Ring` element `Iterator` that returns a mutable reference to the
+/// element and a `Cursor` that points to it.
+pub struct IterMut<'a, T> {
+    cur: Cursor<T>,
+    ring: &'a mut Ring<T>,
+}
 
-// impl<'a, T> Iterator for IterMut<'a, T> {
-//     type Item = (&'a mut T, Cursor<T>);
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item = (&'a mut T, Cursor<T>);
 
-//     fn next(&mut self) -> Option<Self::Item> {
-//         self.cur = self.ring.advance(self.cur);
-//         let elem = self.ring.get_mut(self.cur);
-//         Some((elem, self.cur))
-//     }
-// }
+    fn next(&mut self) -> Option<Self::Item> {
+        let curr_cursor = self.cur;
+        self.cur = self.ring.next(curr_cursor);
+        let elem_mut = self.ring.get_mut(curr_cursor);
+        // as ring is mutably borrowed with the lifetime 'a
+        // for this iterator, we can safely return a single
+        // mut reference bound to the lifetime 'a to data inside.
+        let elem_mut = unsafe { &mut *(elem_mut as *mut T) };
+        Some((elem_mut, curr_cursor))
+    }
+}

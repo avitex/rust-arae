@@ -31,9 +31,9 @@ impl<T> AtomicCursor<T> {
     }
 
     #[inline]
-    pub fn advance(&self, ring: &Ring<T>, order: Ordering) {
+    pub fn next(&self, ring: &Ring<T>, order: Ordering) {
         let cursor = self.load(order);
-        let cursor = ring.advance(cursor);
+        let cursor = ring.next(cursor);
         self.store(cursor, order);
     }
 }
