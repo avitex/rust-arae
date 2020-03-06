@@ -434,17 +434,17 @@ impl<T> Drop for Ring<T> {
     }
 }
 
-impl<TL, TR> PartialEq<Ring<TR>> for Ring<TL>
+impl<L, R> PartialEq<Ring<R>> for Ring<L>
 where
-    TL: PartialEq<TR>,
+    L: PartialEq<R>,
 {
-    fn eq(&self, other: &Ring<TR>) -> bool {
+    fn eq(&self, other: &Ring<R>) -> bool {
         if self.len() != other.len() {
             return false;
         }
         let zipped_elems = self.iter().zip(other.iter());
         for ((left_elem, cur), (right_elem, _)) in zipped_elems {
-            if *left_elem != *right_elem {
+            if left_elem != right_elem {
                 return false;
             }
             if self.is_head(cur) {
