@@ -15,4 +15,4 @@ default = ["atomic"]
 atomic = []
 
 [dependencies]
-# none :)
+loom = { version = "0.2", optional = true }

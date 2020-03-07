@@ -1,6 +1,9 @@
 use core::fmt;
 use core::marker::PhantomData;
+#[cfg(not(feature = "loom"))]
 use core::sync::atomic::{AtomicPtr, Ordering};
+#[cfg(feature = "loom")]
+use loom::sync::atomic::{AtomicPtr, Ordering};
 
 use crate::{Cursor, Ring};
 
@@ -57,7 +60,7 @@ impl<T> AtomicCursor<T> {
     }
 }
 
-impl<T> fmt::Debug for AtomicCursor<T> {
+impl<T: fmt::Debug> fmt::Debug for AtomicCursor<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "AtomicCursor({:?})", self.ptr)
     }

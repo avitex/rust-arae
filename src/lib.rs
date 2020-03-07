@@ -385,7 +385,7 @@ impl<T> Ring<T> {
     // private
 
     /// Construct a new `Ring` from its raw parts.
-    /// 
+    ///
     /// # Panics
     /// Panics if `len` is zero or greater than `isize::max_value()`.
     ///
