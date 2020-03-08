@@ -366,7 +366,7 @@ impl<T> Ring<T> {
     ///
     /// let ring: Ring<_> = vec![1, 2].into();
     ///
-    /// for (elem, cursor) in ring.iter_from(1) {
+    /// for (elem, cursor) in ring.iter_at(1) {
     ///     println!("elem: {}", elem);
     ///     if ring.is_tail(cursor) {
     ///         break;
@@ -377,7 +377,7 @@ impl<T> Ring<T> {
     /// # Panics
     /// Panics if `offset > Ring::len()`.
     #[inline]
-    pub fn iter_from(&self, offset: usize) -> Iter<'_, T> {
+    pub fn iter_at(&self, offset: usize) -> Iter<'_, T> {
         Iter::new(self, self.at(offset))
     }
 
@@ -548,9 +548,9 @@ mod tests {
     }
 
     #[test]
-    fn test_ring_iter_from_zero() {
+    fn test_ring_iter_at_zero() {
         let ring: Ring<_> = vec![1, 2].into();
-        let mut ring_iter = ring.iter_from(0);
+        let mut ring_iter = ring.iter_at(0);
 
         let (_, cursor) = ring_iter.next().unwrap();
         assert_eq!(*ring.get(cursor), 1);
@@ -566,9 +566,9 @@ mod tests {
     }
 
     #[test]
-    fn test_ring_iter_from() {
+    fn test_ring_iter_at() {
         let ring: Ring<_> = vec![1, 2].into();
-        let mut ring_iter = ring.iter_from(1);
+        let mut ring_iter = ring.iter_at(1);
 
         let (_, cursor) = ring_iter.next().unwrap();
         assert_eq!(*ring.get(cursor), 2);
@@ -582,13 +582,13 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_ring_iter_from_invalid() {
+    fn test_ring_iter_at_invalid() {
         let ring: Ring<_> = vec![1].into();
-        ring.iter_from(1);
+        ring.iter_at(1);
     }
 
     #[test]
-    fn test_ring_iter_from_single_elem() {
+    fn test_ring_iter_at_single_elem() {
         let ring: Ring<_> = vec![1].into();
         let mut ring_iter = ring.iter();
 
