@@ -6,7 +6,7 @@ pub use self::atomic::AtomicCursor;
 
 /// An opaque structure that represents a location within a `Cursed` structure.
 ///
-/// `Cursor`s can only be created from and used with a initialized `Cursed`
+/// `Cursor`'s can only be created from and used with a initialized `Cursed`
 /// structure, however if the structure is dropped, will point to invalid memory.
 ///
 /// Safety is achieved via `Cursed` structures validating they own the `Cursor`.
@@ -15,31 +15,42 @@ pub struct Cursor<T> {
 }
 
 impl<T> Cursor<T> {
-    /// Constructs new cursor given a valid pointer.
+    /// Constructs a new `Cursor` given a non-null pointer.
     #[inline]
-    pub(crate) fn new(ptr: NonNull<T>) -> Self {
+    pub fn new(ptr: NonNull<T>) -> Self {
         Self { ptr }
     }
 
-    /// Constructs new cursor given a unchecked pointer.
+    /// Constructs a new `Cursor` given a unchecked pointer.
+    /// 
+    /// # Safety
+    /// Must not be null, see `NonNull::new_unchecked` safety notes.
     #[inline]
-    pub(crate) unsafe fn new_unchecked(ptr: *mut T) -> Self {
+    pub unsafe fn new_unchecked(ptr: *mut T) -> Self {
         Self::new(NonNull::new_unchecked(ptr))
     }
 
+    /// Returns the `Cursor`'s underlying pointer.
     #[inline]
-    pub(crate) fn ptr(self) -> NonNull<T> {
+    pub fn ptr(self) -> NonNull<T> {
         self.ptr
     }
 
+    /// Converts the cursor into the atomic variant.
+    #[cfg(feature = "atomic")]
     #[inline]
-    pub(crate) unsafe fn add(self, offset: usize) -> Self {
+    pub fn into_atomic(self) -> AtomicCursor<T> {
+        AtomicCursor::<T>::new(self)
+    }
+
+    #[inline]
+    pub(crate) unsafe fn unchecked_add(self, offset: usize) -> Self {
         let offset_ptr = self.ptr.as_ptr().add(offset);
         Self::new_unchecked(offset_ptr)
     }
 
     #[inline]
-    pub(crate) unsafe fn sub(self, offset: usize) -> Self {
+    pub(crate) unsafe fn unchecked_sub(self, offset: usize) -> Self {
         let offset_ptr = self.ptr.as_ptr().sub(offset);
         Self::new_unchecked(offset_ptr)
     }
@@ -54,13 +65,6 @@ impl<T> Cursor<T> {
             let right = other.ptr.as_ptr() as usize;
             (left - right) / mem::size_of::<T>()
         }
-    }
-
-    /// Converts the cursor into the atomic variant.
-    #[cfg(feature = "atomic")]
-    #[inline]
-    pub fn into_atomic(self) -> AtomicCursor<T> {
-        AtomicCursor::<T>::new(self)
     }
 }
 

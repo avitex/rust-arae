@@ -28,3 +28,8 @@ let read_cursor = vec.head();
 
 assert_eq!(*vec.get(read_cursor), 1);
 ```
+
+## TODO
+
+- Implement `Chain`.
+- Implement `Cursed` for standard structures.

@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 
 use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor};
 
-/// A `CurVec` is head-allocated, non-resizable structure of elements in
+/// A `CurVec` is heap-allocated, non-resizable sequence of elements in
 /// contiguous memory designed for efficent access via `Cursor`s.
 ///
 /// You can access the elements of a `CurVec` the same way you would a `Vec` or
@@ -213,7 +213,7 @@ impl<T> Cursed<T> for CurVec<T> {
         if cursor.ptr() == self.tail {
             None
         } else {
-            let next_cursor = unsafe { cursor.add(1) };
+            let next_cursor = unsafe { cursor.unchecked_add(1) };
             // Sanity check.
             assert!(self.is_owner(cursor));
             // Return the advanced cursor.
@@ -228,7 +228,7 @@ impl<T> Cursed<T> for CurVec<T> {
         if cursor.ptr() == self.head {
             None
         } else {
-            let prev_cursor = unsafe { cursor.sub(1) };
+            let prev_cursor = unsafe { cursor.unchecked_sub(1) };
             // Sanity check.
             assert!(self.is_owner(cursor));
             // Return the reversed cursor.
@@ -256,7 +256,7 @@ impl<T> Bounded<T> for CurVec<T> {
     #[inline]
     fn at(&self, offset: usize) -> Option<Cursor<T>> {
         if offset < self.len() {
-            Some(unsafe { self.head().add(offset) })
+            Some(unsafe { self.head().unchecked_add(offset) })
         } else {
             None
         }
