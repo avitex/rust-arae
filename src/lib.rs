@@ -36,9 +36,12 @@ mod atomic;
 pub mod cursor;
 pub mod iter;
 mod vec;
+mod chain;
 
 use core::borrow::Borrow;
 
+#[cfg(feature = "atomic")]
+pub use self::chain::Chain;
 pub use self::cursor::{Cursor, CursorExt};
 pub use self::vec::CurVec;
 
