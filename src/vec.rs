@@ -20,16 +20,16 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor, Sequence};
 /// - **Cannot** be empty.
 /// - **Cannot** contain elements of `mem::size_of() == 0`.
 /// - **Cannot** be resized (and does not have any notion of capacity).
-/// 
+///
 /// ## Conversion
-/// 
+///
 /// - Converting from and into a `Vec<T>` or `Box<[T]>` is a zero-copy operation.
 /// - When converting from a `Vec<T>` excess capacity is stripped.
-/// - Converting from a `Vec<T>`, `Box<[T]>` or similar types will panic if 
+/// - Converting from a `Vec<T>`, `Box<[T]>` or similar types will panic if
 ///   their length is zero.
 ///
 /// ## Example
-/// 
+///
 /// ```rust
 /// use arae::{CurVec, CursedExt, Bounded};
 ///
@@ -183,7 +183,7 @@ impl<T> CurVec<T> {
 }
 
 impl<T: Default> CurVec<T> {
-    /// Construct a new `CurVec` with a given length with elements initialized 
+    /// Construct a new `CurVec` with a given length with elements initialized
     /// via `Default::default()`.
     pub fn new_with_default(len: usize) -> Self {
         Self::new_with_init(len, T::default)
@@ -299,7 +299,7 @@ impl<T> From<Box<[T]>> for CurVec<T> {
         let ptr = NonNull::new(value.as_ptr() as _).expect("non-null box ptr");
         // Get the box slice len.
         let len = value.len();
-        // We are taking control of the data to 
+        // We are taking control of the data to
         // prevent the data being dropped.
         mem::forget(value);
         // Construct the vec from the raw parts.
