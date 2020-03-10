@@ -54,7 +54,7 @@ where
 ///////////////////////////////////////////////////////////////////////////////
 // WrappingIter
 
-/// A `Cursed` element `Iterator` that returns a reference to the
+/// A never ending `Cursed` element `Iterator` that returns a reference to the
 /// element and a `Cursor` that points to it.
 #[derive(Debug)]
 pub struct WrappingIter<'a, C, T> {

@@ -197,10 +197,6 @@ impl<T> Cursed<T> for CurVec<T> {
         unsafe { &mut *cursor.ptr().as_ptr() }
     }
 
-    /// Returns `true` if the cursor is owned by the `CurVec`, `false` if not.
-    ///
-    /// Ownership is determined by checking whether the cursor pointer is
-    /// equal to, or between the head pointer and the tail pointer.
     #[inline]
     fn is_owner(&self, cursor: Cursor<T>) -> bool {
         (self.head..=self.tail).contains(&cursor.ptr())

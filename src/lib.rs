@@ -6,8 +6,25 @@
     rust_2018_idioms
 )]
 
-//! `arae` provides traits and structures for types that are `Cursed`,
-//! a trait for types that allow accessing their elements given a `Cursor`.
+//! `arae` provides `Cursed`, a trait for types that allow accessing their 
+//! elements given a `Cursor` and types built upon it.
+//! 
+//! ## Example
+//! ```rust
+//! use arae::{CurVec, Cursed, Bounded};
+//!
+//! // Create a new `CurVec` of length 10 with the elements 
+//! // initialized via `Default::default`.
+//! let mut vec = CurVec::new_with_default(10);
+//!
+//! // Create two cursors pointing the the head of the vec.
+//! let write_cursor = vec.head();
+//! let read_cursor = vec.head();
+//!
+//! *vec.get_mut(write_cursor) = 1;
+//!
+//! assert_eq!(*vec.get(read_cursor), 1);
+//! ```
 
 extern crate alloc;
 
