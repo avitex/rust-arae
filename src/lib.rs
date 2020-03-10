@@ -6,14 +6,14 @@
     rust_2018_idioms
 )]
 
-//! `arae` provides `Cursed`, a trait for types that allow accessing their 
+//! `arae` provides `Cursed`, a trait for types that allow accessing their
 //! elements given a `Cursor` and types built upon it.
-//! 
+//!
 //! ## Example
 //! ```rust
-//! use arae::{CurVec, Cursed, Bounded};
+//! use arae::{CurVec, Cursed, CursedExt, Bounded};
 //!
-//! // Create a new `CurVec` of length 10 with the elements 
+//! // Create a new `CurVec` of length 10 with the elements
 //! // initialized via `Default::default`.
 //! let mut vec = CurVec::new_with_default(10);
 //!
@@ -54,38 +54,6 @@ pub trait Cursed<T> {
     /// Returns `true` if the cursor is owned by self, `false` if not.
     fn is_owner(&self, cursor: Cursor<T>) -> bool;
 
-    /// Returns a reference to the element at the given cursor.
-    ///
-    /// # Example
-    /// ```rust
-    /// use arae::{CurVec, Cursed, Bounded};
-    ///
-    /// let vec = CurVec::<u8>::new_with_default(1);
-    ///
-    /// assert_eq!(*vec.get(vec.head()), 0);
-    /// ```
-    ///
-    /// # Panics
-    /// Panics if self does not own the cursor.
-    fn get(&self, cursor: Cursor<T>) -> &T;
-
-    /// Returns a mutable reference to the element at the given cursor.
-    ///
-    /// # Example
-    /// ```rust
-    /// use arae::{CurVec, Cursed, Bounded};
-    ///
-    /// let mut vec = CurVec::<u8>::new_with_default(1);
-    ///
-    /// *vec.get_mut(vec.head()) = 1;
-    ///
-    /// assert_eq!(*vec.get(vec.head()), 1);
-    /// ```
-    ///
-    /// # Panics
-    /// Panics if self does not own the cursor.
-    fn get_mut(&mut self, cursor: Cursor<T>) -> &mut T;
-
     /// Given a cursor, return its next element step.
     ///
     /// `None` is returned if the cursor provided cannot advance any further.
@@ -122,6 +90,45 @@ pub unsafe trait Contiguous<T>: Bounded<T> {}
 
 /// Extended functionality for implementations of `Cursed`.
 pub trait CursedExt<T>: Cursed<T> + Sized {
+    /// Returns a reference to the element at the given cursor.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, CursedExt, Bounded};
+    ///
+    /// let mut vec: CurVec<_> = vec![0].into();
+    ///
+    /// assert_eq!(*vec.get(vec.head()), 0);
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if self does not own the cursor.
+    #[inline]
+    fn get(&self, cursor: Cursor<T>) -> &T {
+        cursor.get(self)
+    }
+
+    /// Returns a mutable reference to the element at the given cursor.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, CursedExt, Bounded};
+    ///
+    /// let mut vec: CurVec<_> = vec![0].into();
+    ///
+    /// *vec.get_mut(vec.head()) = 1;
+    ///
+    /// assert_eq!(*vec.get(vec.head()), 1);
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if self does not own the cursor.
+    #[inline]
+    fn get_mut(&mut self, cursor: Cursor<T>) -> &mut T {
+        assert!(self.is_owner(cursor));
+        unsafe { &mut *cursor.ptr().as_ptr() }
+    }
+
     /// Returns `true` if the cursor points to the first element, `false` if not.
     #[inline]
     fn is_head(&self, cursor: Cursor<T>) -> bool

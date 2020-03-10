@@ -4,12 +4,14 @@ use core::{cmp, fmt, mem};
 #[cfg(feature = "atomic")]
 pub use self::atomic::AtomicCursor;
 
+use crate::Cursed;
+
 /// An opaque structure that represents a location within a `Cursed` structure.
 ///
-/// `Cursor`'s can only be created from and used with a initialized `Cursed`
-/// structure, however if the structure is dropped, will point to invalid memory.
+/// `Cursor`'s are created from and used with initialized their owning `Cursed`
+/// structures, however if the structure is dropped, will point to invalid memory.
 ///
-/// Safety is achieved via `Cursed` structures validating they own the `Cursor`.
+/// Safety is achieved via `Cursor` validating it's owned by the `Cursed` structure.
 pub struct Cursor<T> {
     ptr: NonNull<T>,
 }
@@ -21,8 +23,58 @@ impl<T> Cursor<T> {
         Self { ptr }
     }
 
+    /// Returns a reference to the element the `Cursor` is pointing to.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, Bounded};
+    ///
+    /// let mut vec: CurVec<_> = vec![0].into();
+    ///
+    /// let cursor = vec.head();
+    ///
+    /// assert_eq!(*cursor.get(&vec), 0);
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if `cursed` does not own self.
+    #[inline]
+    pub fn get<C>(self, cursed: &C) -> &T
+    where
+        C: Cursed<T>,
+    {
+        assert!(cursed.is_owner(self));
+        unsafe { &*self.ptr.as_ptr() }
+    }
+
+    /// Returns a mutable reference to the element the `Cursor` is pointing to.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Bounded};
+    ///
+    /// let mut vec: CurVec<_> = vec![0].into();
+    ///
+    /// let cursor = vec.head();
+    ///
+    /// *cursor.get_mut(&mut vec) = 1;
+    ///
+    /// assert_eq!(*cursor.get(&vec), 1);
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if `cursed` does not own self.
+    #[inline]
+    pub fn get_mut<C>(self, cursed: &mut C) -> &mut T
+    where
+        C: Cursed<T>,
+    {
+        assert!(cursed.is_owner(self));
+        unsafe { &mut *self.ptr.as_ptr() }
+    }
+
     /// Constructs a new `Cursor` given a unchecked pointer.
-    /// 
+    ///
     /// # Safety
     /// Must not be null, see `NonNull::new_unchecked` safety notes.
     #[inline]

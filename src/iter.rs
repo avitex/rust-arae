@@ -1,4 +1,4 @@
-use crate::{Cursed, Bounded, CursedExt, Cursor};
+use crate::{Bounded, Cursed, CursedExt, Cursor};
 
 /// A `Cursed` element `Iterator` that returns a reference to the
 /// element and a `Cursor` that points to it.

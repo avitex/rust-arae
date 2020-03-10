@@ -22,7 +22,7 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor};
 ///   unlike a `Vec` which stores the first element pointer and length.
 ///
 /// ```rust
-/// use arae::{CurVec, Cursed, Bounded};
+/// use arae::{CurVec, Cursed, CursedExt, Bounded};
 ///
 /// // Create a new `CurVec` of length 10 with the elements
 /// // initialized via `Default::default`.
@@ -183,18 +183,6 @@ impl<T> Cursed<T> for CurVec<T> {
             self.len() - self.offset(cursor)
         };
         (remaining, Some(remaining))
-    }
-
-    #[inline]
-    fn get(&self, cursor: Cursor<T>) -> &T {
-        assert!(self.is_owner(cursor));
-        unsafe { &*cursor.ptr().as_ptr() }
-    }
-
-    #[inline]
-    fn get_mut(&mut self, cursor: Cursor<T>) -> &mut T {
-        assert!(self.is_owner(cursor));
-        unsafe { &mut *cursor.ptr().as_ptr() }
     }
 
     #[inline]
