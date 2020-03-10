@@ -12,15 +12,24 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor, Sequence};
 ///
 /// You can access the elements of a `CurVec` the same way you would a `Vec` or
 /// `Box<[T]>` however it's characteristics are different to what either provide.
+/// Unlike a `Vec` which stores the data ptr, length and capacity a `CurVec` stores 
+/// the starting element ptr (`head`) and end element ptr (`tail`).
 ///
 /// A `CurVec`:
 ///
 /// - **Cannot** be empty.
 /// - **Cannot** contain elements of `mem::size_of() == 0`.
 /// - **Cannot** be resized (and does not have any notion of capacity).
-/// - Stores the starting element pointer (`head`) and end element pointer (`tail`)
-///   unlike a `Vec` which stores the first element pointer and length.
+/// 
+/// ## Conversion
+/// 
+/// - Converting from and into a `Vec<T>` or `Box<[T]>` is a zero-copy operation.
+/// - When converting from a `Vec<T>` excess capacity is stripped.
+/// - Converting from a `Vec<T>`, `Box<[T]>` or similar types will panic if 
+///   their length is zero.
 ///
+/// ## Example
+/// 
 /// ```rust
 /// use arae::{CurVec, CursedExt, Bounded};
 ///
