@@ -214,7 +214,6 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     where
         Self: Bounded<T>,
     {
-        // Wrap the cursor if currently at the vec tail.
         if cursor == self.head() {
             self.tail()
         } else {
