@@ -14,17 +14,17 @@ arae = "0.1.0"
 ## Example
 
 ```rust
-use arae::Ring;
+use arae::{CurVec, Cursed, Bounded};
 
-// Create a new `Ring` of length 10 with the elements 
+// Create a new `CurVec` of length 10 with the elements 
 // initialized via `Default::default`.
-let mut ring = Ring::new_with_default(10);
+let mut vec = CurVec::new_with_default(10);
 
-// Create two cursors pointing the the head of the ring.
-let write_cursor = ring.head();
-let read_cursor = ring.head();
+// Create two cursors pointing the the head of the vec.
+let write_cursor = vec.head();
+let read_cursor = vec.head();
 
-*ring.get_mut(write_cursor) = 1;
+*vec.get_mut(write_cursor) = 1;
 
-assert_eq!(*ring.get(read_cursor), 1);
+assert_eq!(*vec.get(read_cursor), 1);
 ```

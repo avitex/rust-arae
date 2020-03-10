@@ -1,4 +1,4 @@
-use crate::{Bounded, CursedExt, Cursor};
+use crate::{Cursed, Bounded, CursedExt, Cursor};
 
 /// A `Cursed` element `Iterator` that returns a reference to the
 /// element and a `Cursor` that points to it.
@@ -18,12 +18,15 @@ impl<'a, C, T> Iter<'a, C, T> {
 
 impl<'a, C, T: 'a> Iterator for Iter<'a, C, T>
 where
-    C: Bounded<T>,
+    C: Cursed<T>,
 {
     type Item = (&'a T, Cursor<T>);
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.cursed.remaining(self.cursed.head())
+        match self.cursor {
+            Some(cursor) => self.cursed.remaining(cursor),
+            None => (0, Some(0)),
+        }
     }
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -37,7 +40,7 @@ where
 
 impl<'a, C, T: 'a> DoubleEndedIterator for Iter<'a, C, T>
 where
-    C: Bounded<T>,
+    C: Cursed<T>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.cursor.map(|curr_cursor| {
@@ -73,7 +76,7 @@ where
     type Item = (&'a T, Cursor<T>);
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.cursed.remaining(self.cursed.head())
+        (0, None)
     }
 
     fn next(&mut self) -> Option<Self::Item> {
