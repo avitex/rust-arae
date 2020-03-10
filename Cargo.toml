@@ -1,6 +1,6 @@
 [package]
 name = "arae"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["avitex <theavitex@gmail.com>"]
 edition = "2018"
 categories = ["no-std", "concurrency", "data-structures"]

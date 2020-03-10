@@ -8,7 +8,7 @@
 Documentation hosted on [docs.rs](https://docs.rs/arae).
 
 ```toml
-arae = "0.1.0"
+arae = "0.2.0"
 ```
 
 ## Example
