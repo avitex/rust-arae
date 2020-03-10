@@ -22,7 +22,7 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor, Sequence};
 ///   unlike a `Vec` which stores the first element pointer and length.
 ///
 /// ```rust
-/// use arae::{CurVec, Cursed, CursedExt, Bounded};
+/// use arae::{CurVec, CursedExt, Bounded};
 ///
 /// // Create a new `CurVec` of length 10 with the elements
 /// // initialized via `Default::default`.

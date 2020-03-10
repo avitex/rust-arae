@@ -29,7 +29,7 @@ impl<T> Cursor<T> {
     ///
     /// # Example
     /// ```rust
-    /// use arae::{CurVec, Cursed, Bounded};
+    /// use arae::{CurVec, Bounded};
     ///
     /// let mut vec: CurVec<_> = vec![0].into();
     ///

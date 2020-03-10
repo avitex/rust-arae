@@ -11,7 +11,7 @@
 //!
 //! ## Example
 //! ```rust
-//! use arae::{CurVec, Cursed, CursedExt, Bounded};
+//! use arae::{CurVec, CursedExt, Bounded};
 //!
 //! // Create a new `CurVec` of length 10 with the elements
 //! // initialized via `Default::default`.
@@ -140,7 +140,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Example
     /// ```rust
-    /// use arae::{CurVec, Cursed, CursedExt, Bounded};
+    /// use arae::{CurVec, CursedExt, Bounded};
     ///
     /// let mut vec: CurVec<_> = vec![0].into();
     ///
@@ -160,7 +160,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Example
     /// ```rust
-    /// use arae::{CurVec, Cursed, CursedExt, Bounded};
+    /// use arae::{CurVec, CursedExt, Bounded};
     ///
     /// let mut vec: CurVec<_> = vec![0].into();
     ///
@@ -221,7 +221,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Example
     /// ```rust
-    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    /// use arae::{CurVec, CursedExt, Bounded};
     ///
     /// let vec: CurVec<_> = vec![1, 2, 3].into();
     ///
@@ -256,7 +256,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Example
     /// ```rust
-    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    /// use arae::{CurVec, CursedExt, Bounded};
     ///
     /// let vec: CurVec<_> = vec![1, 2, 3].into();
     ///
@@ -288,7 +288,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Example
     /// ```rust
-    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    /// use arae::{CurVec, CursedExt};
     ///
     /// let vec: CurVec<_> = vec![1, 2].into();
     ///
@@ -308,7 +308,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Example
     /// ```rust
-    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    /// use arae::{CurVec, CursedExt, Bounded};
     ///
     /// let vec: CurVec<_> = vec![1, 2].into();
     ///
@@ -333,7 +333,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Example
     /// ```rust
-    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    /// use arae::{CurVec, CursedExt};
     ///
     /// let vec: CurVec<_> = vec![1, 2].into();
     ///
@@ -360,7 +360,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Example
     /// ```rust
-    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    /// use arae::{CurVec, CursedExt, Bounded};
     ///
     /// let vec: CurVec<_> = vec![1, 2].into();
     ///
