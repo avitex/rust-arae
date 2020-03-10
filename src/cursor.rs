@@ -12,7 +12,7 @@ use crate::Cursed;
 /// structure, however if the structure is dropped, will point to invalid memory.
 ///
 /// Safety is achieved via `Cursor` validating it's owned by the [`Cursed`] structure.
-/// 
+///
 /// [`Cursed`]: trait.Cursed.html
 pub struct Cursor<T> {
     ptr: NonNull<T>,
@@ -167,7 +167,7 @@ mod atomic {
     use crate::{Bounded, Cursed, CursedExt, Cursor};
 
     /// An atomic wrapper around a [`Cursor`].
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     pub struct AtomicCursor<T> {
         ptr: AtomicPtr<T>,

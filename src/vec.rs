@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 
 use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor};
 
-/// A heap-allocated, fixed-size, array of values in contiguous memory designed 
+/// A heap-allocated, fixed-size, array of values in contiguous memory designed
 /// for efficient access via [`Cursor`]s.
 ///
 /// You can access the elements of a `CurVec` the same way you would a `Vec` or
@@ -38,7 +38,7 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor};
 /// // Read the value at the element pointed by `read_cursor`.
 /// assert_eq!(*vec.get(read_cursor), 1);
 /// ```
-/// 
+///
 /// [`Cursor`]: struct.Cursor.html
 pub struct CurVec<T> {
     head: NonNull<T>,

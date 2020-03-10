@@ -41,7 +41,7 @@ pub use self::vec::CurVec;
 use self::iter::{Iter, WrappingIter};
 
 /// `Cursed` types allow accessing their elements via [`Cursor`]s.
-/// 
+///
 /// [`Cursor`]: struct.Cursor.html
 pub trait Cursed<T> {
     /// Given a cursor, return the remaining steps as a known lower and
@@ -63,7 +63,7 @@ pub trait Cursed<T> {
 }
 
 /// [`Cursed`] types that are `Bounded` know their `head` and `tail` locations.
-/// 
+///
 /// [`Cursed`]: trait.Cursed.html
 #[allow(clippy::len_without_is_empty)]
 pub trait Bounded<T>: Cursed<T> {
@@ -83,18 +83,18 @@ pub trait Bounded<T>: Cursed<T> {
 
 /// [`Cursed`] types that are `Contiguous` guarantee elements reside right next
 /// to each other in memory (eg `Vec<T>`, `[T]`).
-/// 
-/// This trait is `unsafe` as dependencies may implement unsafe behaviour with 
+///
+/// This trait is `unsafe` as dependencies may implement unsafe behaviour with
 /// this guarantee.
 ///
 /// # Safety
 /// Implementers must ensure all elements reside next to each other in memory.
-/// 
+///
 /// [`Cursed`]: trait.Cursed.html
 pub unsafe trait Contiguous<T>: Bounded<T> {}
 
 /// Extended functionality for implementations of [`Cursed`].
-/// 
+///
 /// [`Cursed`]: trait.Cursed.html
 pub trait CursedExt<T>: Cursed<T> + Sized {
     /// Returns a reference to the element at the given [`Cursor`].
@@ -110,7 +110,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Panics
     /// Panics if `self` does not own the [`Cursor`].
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     #[inline]
     fn get(&self, cursor: Cursor<T>) -> &T {
@@ -132,7 +132,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Panics
     /// Panics if `self` does not own the [`Cursor`].
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     #[inline]
     fn get_mut(&mut self, cursor: Cursor<T>) -> &mut T {
@@ -140,7 +140,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     }
 
     /// Returns `true` if the [`Cursor`] points at the first element, `false` if not.
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     #[inline]
     fn is_head(&self, cursor: Cursor<T>) -> bool
@@ -151,7 +151,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     }
 
     /// Returns `true` if the [`Cursor`] points at the last element, `false` if not.
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     #[inline]
     fn is_tail(&self, cursor: Cursor<T>) -> bool
@@ -165,7 +165,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Panics
     /// Panics if `self` does not own the [`Cursor`].
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     fn offset(&self, cursor: Cursor<T>) -> usize
     where
@@ -193,7 +193,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Panics
     /// Panics if `self` does not own the [`Cursor`].
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     #[inline]
     fn wrapping_next(&self, cursor: Cursor<T>) -> Cursor<T>
@@ -228,7 +228,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// # Panics
     /// Panics if `self` does not own the [`Cursor`].
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     #[inline]
     fn wrapping_prev(&self, cursor: Cursor<T>) -> Cursor<T>
@@ -277,7 +277,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///     println!("elem {} at {:?}:", elem, cursor);
     /// }
     /// ```
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     fn iter_at(&self, cursor: Cursor<T>) -> Iter<'_, Self, T> {
         Iter::new(self, cursor)
@@ -329,7 +329,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///     }
     /// }
     /// ```
-    /// 
+    ///
     /// [`Cursor`]: struct.Cursor.html
     #[inline]
     fn wrapping_iter_at(&self, cursor: Cursor<T>) -> WrappingIter<'_, Self, T> {

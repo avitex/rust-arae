@@ -1,4 +1,4 @@
-use arae::{CurVec, Cursed, CursedExt, Bounded};
+use arae::{Bounded, CurVec, Cursed, CursedExt};
 
 #[test]
 #[should_panic]
