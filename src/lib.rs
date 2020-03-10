@@ -6,598 +6,297 @@
     rust_2018_idioms
 )]
 
-//! Provides the heap allocated cyclic `Ring` and associated `Cursor` structures.
-//!
-//! # Example
-//! ```rust
-//! use carousel::Ring;
-//!
-//! // Create a new `Ring` of length 10 with the elements
-//! // initialized via `Default::default`.
-//! let mut ring = Ring::new_with_default(10);
-//!
-//! // Create two cursors pointing the the head of the ring.
-//! let write_cursor = ring.head();
-//! let read_cursor = ring.head();
-//!
-//! *ring.get_mut(write_cursor) = 1;
-//!
-//! assert_eq!(*ring.get(read_cursor), 1);
-//! ```
-
-#[cfg(feature = "atomic")]
-mod atomic;
-mod cursor;
-mod iter;
+//! `arae` provides traits and structures for types that are `Cursed`,
+//! a trait for types that allow accessing their elements given a `Cursor`.
 
 extern crate alloc;
 
-use core::mem::{self, MaybeUninit};
-use core::ptr::NonNull;
-use core::{fmt, slice};
+//#[cfg(feature = "atomic")]
+//mod chain;
+mod cursor;
+/// Iterators for `Cursed` types.
+pub mod iter;
+mod vec;
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+//#[cfg(feature = "atomic")]
+//pub use self::chain::Chain;
 
 #[cfg(feature = "atomic")]
-pub use self::atomic::AtomicCursor;
+pub use self::cursor::AtomicCursor;
 pub use self::cursor::Cursor;
-pub use self::iter::Iter;
+pub use self::vec::CurVec;
 
-/// A `Ring` is a cyclic structure of values in contiguous memory.
+use self::iter::{Iter, WrappingIter};
+
+/// `Cursed` types allow accessing their elements via `Cursor`s.
+pub trait Cursed<T> {
+    /// Given a cursor, return the remaining steps as a known lower and
+    /// optional upper bound.
+    fn remaining(&self, cursor: Cursor<T>) -> (usize, Option<usize>);
+
+    /// Returns `true` if the cursor is owned by self, `false` if not.
+    fn is_owner(&self, cursor: Cursor<T>) -> bool;
+
+    /// Returns a reference to the element at the given cursor.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, Bounded};
+    ///
+    /// let vec = CurVec::<u8>::new_with_default(1);
+    ///
+    /// assert_eq!(*vec.get(vec.head()), 0);
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if self does not own the cursor.
+    fn get(&self, cursor: Cursor<T>) -> &T;
+
+    /// Returns a mutable reference to the element at the given cursor.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, Bounded};
+    ///
+    /// let mut vec = CurVec::<u8>::new_with_default(1);
+    ///
+    /// *vec.get_mut(vec.head()) = 1;
+    ///
+    /// assert_eq!(*vec.get(vec.head()), 1);
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if self does not own the cursor.
+    fn get_mut(&mut self, cursor: Cursor<T>) -> &mut T;
+
+    /// Given a cursor, return its next element step.
+    ///
+    /// `None` is returned if the cursor provided cannot advance any further.
+    fn next(&self, cursor: Cursor<T>) -> Option<Cursor<T>>;
+
+    /// Given a cursor, return its previous element step.
+    ///
+    /// `None` is returned if the cursor provided cannot reverse any further.
+    fn prev(&self, cursor: Cursor<T>) -> Option<Cursor<T>>;
+}
+
+/// `Cursed` types that are `Bounded` know their `head` and `tail` locations.
+pub trait Bounded<T>: Cursed<T> {
+    /// Returns the number of items within the sequence.
+    fn len(&self) -> usize;
+
+    /// Returns a cursor pointing to the head of the sequence.
+    fn head(&self) -> Cursor<T>;
+
+    /// Returns a cursor pointing to the tail of the sequence.
+    fn tail(&self) -> Cursor<T>;
+
+    /// Returns `Some(Cursor)` at the given offset from the head of the sequence,
+    /// `None` if the offset is out of bounds.
+    fn at(&self, offset: usize) -> Option<Cursor<T>>;
+}
+
+/// `Cursed` types that are `Contiguous` guarantee elements reside right next
+/// to each other in memory (eg `Vec<T>`, `[T]`).
 ///
-/// Elements within a `Ring` are accessed via `Cursor`s.
-pub struct Ring<T> {
-    head: NonNull<T>,
-    tail: NonNull<T>,
-}
+/// # Safety
+/// `unsafe` as dependencies may impl unsafe behaviour with this guarantee.
+pub unsafe trait Contiguous<T>: Bounded<T> {}
 
-impl<T> Ring<T> {
-    /// Construct a new `Ring` with a given length and an element
-    /// initializer that cannot fail.
-    pub fn new_with_init<F>(len: usize, mut init_fn: F) -> Self
+/// Extended functionality for implementations of `Cursed`.
+pub trait CursedExt<T>: Cursed<T> + Sized {
+    /// Returns `true` if the cursor points to the first element, `false` if not.
+    #[inline]
+    fn is_head(&self, cursor: Cursor<T>) -> bool
     where
-        F: FnMut() -> T,
+        Self: Bounded<T>,
     {
-        match Self::try_new_with_init::<_, ()>(len, || Ok(init_fn())) {
-            Ok(this) => this,
-            Err(()) => unreachable!(),
-        }
+        cursor == self.head()
     }
 
-    /// Construct a new `Ring` with a given length and an element
-    /// initializer that may fail.
-    pub fn try_new_with_init<F, E>(len: usize, mut init_fn: F) -> Result<Self, E>
+    /// Returns `true` if the cursor points to the last element, `false` if not.
+    #[inline]
+    fn is_tail(&self, cursor: Cursor<T>) -> bool
     where
-        F: FnMut() -> Result<T, E>,
+        Self: Bounded<T>,
     {
-        // ensure we aren't trying to alloc nothing.
-        // it is invalid for a ring to be empty.
-        assert_ne!(len, 0);
-        assert_ne!(mem::size_of::<T>(), 0);
-
-        // allocate the memory for the ring.
-        let mut vec: Vec<MaybeUninit<T>> = Vec::with_capacity(len);
-
-        // set the vec len to the capacity,
-        // we initialize the elements below.
-        unsafe { vec.set_len(len) }
-
-        // initialize the elements.
-        for i in 0..len {
-            match init_fn() {
-                // set the elem if init_fn was successful in returning a value.
-                Ok(elem_val) => vec[i] = MaybeUninit::new(elem_val),
-                // if init_fn failed on the first attempt to initialize a value,
-                // we just set the vec len to zero again, and let the vec scope
-                // drop handle the dealloc.
-                Err(err) if i == 0 => {
-                    // nothing was initialized so set the len to zero.
-                    unsafe { vec.set_len(0) };
-                    // return the error.
-                    return Err(err);
-                }
-                // if init_fn was unsuccessful we need to destroy the data we
-                // just initialized as well as the vec and return the error.
-                Err(err) => {
-                    unsafe {
-                        // we didn't succeed in initializing this element, but
-                        // we did for `i - 1` elements, so set the vec len to that.
-                        vec.set_len(i - 1);
-                        // we want vec to handle deinitializing the data for us,
-                        // so we transmute the vec now, removing `MaybeUninit`,
-                        // which is safe in that above we set the correct len.
-                        //
-                        // as vec drops out of scope it will drop the data for us.
-                        mem::transmute::<_, Vec<T>>(vec);
-                    };
-                    // return the error.
-                    return Err(err);
-                }
-            }
-        }
-
-        // we initialized all the elements above successfully,
-        // so transmute to the initialized type.
-        let mut vec = unsafe { mem::transmute::<_, Vec<T>>(vec) };
-
-        // get the raw vec parts.
-        let ptr = vec.as_mut_ptr();
-
-        // we are taking control of the data.
-        mem::forget(vec);
-
-        unsafe {
-            // safe as vec will alloc and return a valid ptr.
-            let ptr = NonNull::new_unchecked(ptr);
-
-            // return the new ring.
-            Ok(Self::from_raw_parts(ptr, len))
-        }
-    }
-}
-
-impl<T: Default> Ring<T> {
-    /// Construct a new `Ring` with a given length with elements
-    /// initialized via `Default::default()`.
-    pub fn new_with_default(len: usize) -> Self {
-        Self::new_with_init(len, T::default)
-    }
-}
-
-#[allow(clippy::len_without_is_empty)]
-impl<T> Ring<T> {
-    /// Returns the length of the ring.
-    #[inline]
-    pub fn len(&self) -> usize {
-        let byte_len = self.tail.as_ptr() as usize - self.head.as_ptr() as usize;
-        (byte_len / mem::size_of::<T>()) + 1
+        cursor == self.tail()
     }
 
-    /// Returns a cursor at the given offset from the head of the ring.
+    /// Returns the element offset at the given cursor.
     ///
     /// # Panics
-    /// Panics if `offset >= Ring::len()`.
-    #[inline]
-    pub fn at(&self, offset: usize) -> Cursor<T> {
-        Cursor::new(self.head_offset_ptr(offset))
-    }
-
-    /// Returns a cursor pointing to the head of the ring.
-    #[inline]
-    pub fn head(&self) -> Cursor<T> {
-        Cursor::new(self.head)
-    }
-
-    /// Returns a cursor pointing to the tail of the ring.
-    #[inline]
-    pub fn tail(&self) -> Cursor<T> {
-        Cursor::new(self.tail)
-    }
-
-    /// Returns a reference to the element at the given cursor in the ring.
-    ///
-    /// # Example
-    /// ```rust
-    /// use carousel::Ring;
-    ///
-    /// let ring = Ring::<u8>::new_with_default(1);
-    ///
-    /// assert_eq!(*ring.get(ring.head()), 0);
-    /// ```
-    ///
-    /// # Panics
-    /// Panics if the ring does not own the cursor.
-    #[inline]
-    pub fn get(&self, cursor: Cursor<T>) -> &T {
-        self.assert_in_bounds(cursor);
-        unsafe { &*cursor.ptr().as_ptr() }
-    }
-
-    /// Returns a mutable reference to the element at the given cursor in the ring.
-    ///
-    /// # Example
-    /// ```rust
-    /// use carousel::Ring;
-    ///
-    /// let mut ring = Ring::<u8>::new_with_default(1);
-    ///
-    /// *ring.get_mut(ring.head()) = 1;
-    ///
-    /// assert_eq!(*ring.get(ring.head()), 1);
-    /// ```
-    ///
-    /// # Panics
-    /// Panics if the ring does not own the cursor.
-    #[inline]
-    pub fn get_mut(&mut self, cursor: Cursor<T>) -> &mut T {
-        self.assert_in_bounds(cursor);
-        unsafe { &mut *cursor.ptr().as_ptr() }
-    }
-
-    /// Given a cursor, return its next element step through the ring.
-    ///
-    /// If the cursor provided points to the tail, the cursor returned
-    /// will wrap and point to the head of the ring.
-    ///
-    /// # Example
-    /// ```rust
-    /// use carousel::Ring;
-    ///
-    /// let ring: Ring<_> = vec![1, 2, 3].into();
-    ///
-    /// let cursor = ring.next(ring.tail());
-    ///
-    /// assert_eq!(*ring.get(cursor), 1);
-    /// ```
-    ///
-    /// # Panics
-    /// Panics if the ring does not own the cursor.
-    #[inline]
-    // NOTE: we assume the cursor given to us is valid and
-    // check it after our advance operation (see sanity check).
-    pub fn next(&self, cursor: Cursor<T>) -> Cursor<T> {
-        // get the current cursor ptr.
-        let cursor_ptr = cursor.ptr();
-
-        // wrap the cursor ptr if currently at the ring tail.
-        let next_cursor = if cursor_ptr == self.tail {
-            Cursor::new(self.head)
-        } else {
-            unsafe {
-                let ptr = cursor_ptr.as_ptr().add(1);
-                Cursor::new_unchecked(ptr)
-            }
-        };
-
-        // sanity check.
-        self.assert_in_bounds(next_cursor);
-
-        // return the advanced cursor.
-        next_cursor
-    }
-
-    /// Given a cursor, return its previous element step through the ring.
-    ///
-    /// If the cursor provided points to the head, the cursor returned
-    /// will wrap and point to the tail of the ring.
-    ///
-    /// # Example
-    /// ```rust
-    /// use carousel::Ring;
-    ///
-    /// let ring: Ring<_> = vec![1, 2, 3].into();
-    ///
-    /// let cursor = ring.prev(ring.head());
-    ///
-    /// assert_eq!(*ring.get(cursor), 3);
-    /// ```
-    ///
-    /// # Panics
-    /// Panics if the ring does not own the cursor.
-    #[inline]
-    // NOTE: we assume the cursor given to us is valid and
-    // check it after our advance operation (see sanity check).
-    pub fn prev(&self, cursor: Cursor<T>) -> Cursor<T> {
-        // get the current cursor ptr.
-        let cursor_ptr = cursor.ptr();
-
-        // wrap the cursor ptr if currently at the ring head.
-        let prev_cursor = if cursor_ptr == self.head {
-            Cursor::new(self.tail)
-        } else {
-            unsafe {
-                let ptr = cursor_ptr.as_ptr().sub(1);
-                Cursor::new_unchecked(ptr)
-            }
-        };
-
-        // sanity check.
-        self.assert_in_bounds(prev_cursor);
-
-        // return the reversed cursor.
-        prev_cursor
-    }
-
-    /// Returns the element offset at the given cursor in the ring.
-    ///
-    /// # Panics
-    /// Panics if the ring does not own the cursor.
-    #[inline]
-    pub fn offset(&self, cursor: Cursor<T>) -> usize {
-        self.assert_in_bounds(cursor);
-        // calculate the byte offset.
-        // TODO: use `offset_from` when stable.
-        let byte_offset = cursor.ptr().as_ptr() as usize - self.head.as_ptr() as usize;
-        // calculate the element offset and return.
-        byte_offset / mem::size_of::<T>()
-    }
-
-    /// Returns `true` if the cursor points to the first element in the ring,
-    /// `false` if not.
-    #[inline]
-    pub fn is_head(&self, cursor: Cursor<T>) -> bool {
-        cursor.ptr() == self.head
-    }
-
-    /// Returns `true` if the cursor points to the last element in the ring,
-    /// `false` if not.
-    #[inline]
-    pub fn is_tail(&self, cursor: Cursor<T>) -> bool {
-        cursor.ptr() == self.tail
-    }
-
-    /// Returns `true` if the cursor is owned by the ring, `false` if not.
-    ///
-    /// Ownership is determined by checking whether the cursor pointer is
-    /// equal to, or between the head pointer and the tail pointer.
-    #[inline]
-    pub fn is_owner(&self, cursor: Cursor<T>) -> bool {
-        (self.head..=self.tail).contains(&cursor.ptr())
-    }
-
-    /// Returns a never ending element iterator that starts at
-    /// the head of the ring.
-    ///
-    /// # Example
-    /// ```rust
-    /// use carousel::Ring;
-    ///
-    /// let ring: Ring<_> = vec![1, 2].into();
-    ///
-    /// for (elem, cursor) in ring.iter() {
-    ///     println!("elem: {}", elem);
-    ///     if ring.is_tail(cursor) {
-    ///         break;
-    ///     }
-    /// }
-    /// ```
-    #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
-        Iter::new(self, self.head())
-    }
-
-    /// Returns a never ending element iterator that starts at
-    /// a given offset of the ring.
-    ///
-    /// # Example
-    /// ```rust
-    /// use carousel::Ring;
-    ///
-    /// let ring: Ring<_> = vec![1, 2].into();
-    ///
-    /// for (elem, cursor) in ring.iter_at(1) {
-    ///     println!("elem: {}", elem);
-    ///     if ring.is_tail(cursor) {
-    ///         break;
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// # Panics
-    /// Panics if `offset > Ring::len()`.
-    #[inline]
-    pub fn iter_at(&self, offset: usize) -> Iter<'_, T> {
-        Iter::new(self, self.at(offset))
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // private
-
-    /// Construct a new `Ring` from its raw parts.
-    ///
-    /// # Panics
-    /// Panics if `len` is zero or greater than `isize::max_value()`.
-    ///
-    /// # Safety
-    /// Has the same safety constraints and notes as [`slice::from_raw_parts`].
-    ///
-    /// [`slice::from_raw_parts`]: https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html
-    #[inline]
-    unsafe fn from_raw_parts(head_ptr: NonNull<T>, len: usize) -> Self {
-        assert_ne!(len, 0);
-        assert!(len <= isize::max_value() as usize);
-        let head = head_ptr;
-        let tail = NonNull::new_unchecked(head.as_ptr().add(len - 1));
-        Self { head, tail }
-    }
-
-    #[inline]
-    fn assert_in_bounds(&self, cursor: Cursor<T>) {
+    /// Panics if self does not own the cursor.
+    fn offset(&self, cursor: Cursor<T>) -> usize
+    where
+        Self: Bounded<T>,
+    {
         assert!(self.is_owner(cursor));
+        cursor.offset_from(self.head())
     }
 
+    /// Given a cursor, return its next element step.
+    ///
+    /// If the cursor provided points to the end of the structure,
+    /// the cursor returned will wrap and point to the start.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    ///
+    /// let vec: CurVec<_> = vec![1, 2, 3].into();
+    ///
+    /// let cursor = vec.wrapping_next(vec.tail());
+    ///
+    /// assert_eq!(*vec.get(cursor), 1);
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if the structure does not own the cursor.
     #[inline]
-    fn head_offset_ptr(&self, offset: usize) -> NonNull<T> {
-        assert!(offset < self.len());
-        unsafe {
-            let offset_ptr = self.head.as_ptr().add(offset);
-            NonNull::new_unchecked(offset_ptr)
-        }
-    }
-
-    #[inline]
-    fn as_slice(&self) -> &[T] {
-        unsafe { slice::from_raw_parts(self.head.as_ptr() as _, self.len()) }
-    }
-
-    #[inline]
-    fn as_slice_mut(&mut self) -> &mut [T] {
-        unsafe { slice::from_raw_parts_mut(self.head.as_ptr(), self.len()) }
-    }
-}
-
-impl<T: Clone> Clone for Ring<T> {
-    fn clone(&self) -> Self {
-        self.as_slice().to_vec().into()
-    }
-}
-
-impl<T> Drop for Ring<T> {
-    fn drop(&mut self) {
-        unsafe { mem::drop(Box::from_raw(self.as_slice_mut())) }
-    }
-}
-
-impl<L, R> PartialEq<Ring<R>> for Ring<L>
-where
-    L: PartialEq<R>,
-{
-    fn eq(&self, other: &Ring<R>) -> bool {
-        if self.len() != other.len() {
-            return false;
-        }
-        let zipped_elems = self.iter().zip(other.iter());
-        for ((left_elem, cur), (right_elem, _)) in zipped_elems {
-            if left_elem != right_elem {
-                return false;
-            }
-            if self.is_head(cur) {
-                break;
+    fn wrapping_next(&self, cursor: Cursor<T>) -> Cursor<T>
+    where
+        Self: Bounded<T>,
+    {
+        if cursor == self.tail() {
+            self.head()
+        } else {
+            match self.next(cursor) {
+                Some(next_cursor) => next_cursor,
+                None => unreachable!(),
             }
         }
-        true
+    }
+
+    /// Given a cursor, return its previous element step.
+    ///
+    /// If the cursor provided points to the start of the structure,
+    /// the cursor returned will wrap and point to the end.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    ///
+    /// let vec: CurVec<_> = vec![1, 2, 3].into();
+    ///
+    /// let cursor = vec.wrapping_prev(vec.head());
+    ///
+    /// assert_eq!(*vec.get(cursor), 3);
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if the `CurVec` does not own the cursor.
+    #[inline]
+    fn wrapping_prev(&self, cursor: Cursor<T>) -> Cursor<T>
+    where
+        Self: Bounded<T>,
+    {
+        // Wrap the cursor if currently at the vec tail.
+        if cursor == self.head() {
+            self.tail()
+        } else {
+            match self.prev(cursor) {
+                Some(prev_cursor) => prev_cursor,
+                None => unreachable!(),
+            }
+        }
+    }
+
+    /// Returns a `Iterator<Item = (&T, Cursor<T>)>` that starts at the head.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    ///
+    /// let vec: CurVec<_> = vec![1, 2].into();
+    ///
+    /// for (elem, cursor) in vec.iter() {
+    ///     println!("elem {} at {:?}:", elem, cursor);
+    /// }
+    /// ```
+    #[inline]
+    fn iter(&self) -> Iter<'_, Self, T>
+    where
+        Self: Bounded<T>,
+    {
+        self.iter_at(self.head())
+    }
+
+    /// Returns a `Iterator<Item = (&T, Cursor<T>)>` that starts at the given cursor.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    ///
+    /// let vec: CurVec<_> = vec![1, 2].into();
+    ///
+    /// for (elem, cursor) in vec.iter_at(vec.head()) {
+    ///     println!("elem {} at {:?}:", elem, cursor);
+    /// }
+    /// ```
+    fn iter_at(&self, cursor: Cursor<T>) -> Iter<'_, Self, T> {
+        Iter::new(self, cursor)
+    }
+
+    /// Returns a wrapping `Iterator<Item = (&T, Cursor<T>)>` that starts at
+    /// the head.
+    ///
+    /// This iterator is never ending and will wrap from the `tail` to the
+    /// `head` and vice-versa when iterating in the opposite direction.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    ///
+    /// let vec: CurVec<_> = vec![1, 2].into();
+    ///
+    /// for (elem, cursor) in vec.wrapping_iter() {
+    ///     println!("elem: {}", elem);
+    ///     if vec.is_tail(cursor) {
+    ///         break;
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn wrapping_iter(&self) -> WrappingIter<'_, Self, T>
+    where
+        Self: Bounded<T>,
+    {
+        self.wrapping_iter_at(self.head())
+    }
+
+    /// Returns a wrapping `Iterator<Item = (&T, Cursor<T>)>` that starts at
+    /// the given cursor.
+    ///
+    /// This iterator is never ending and will wrap from the `tail` to the
+    /// `head` and vice-versa when iterating in the opposite direction.
+    ///
+    /// # Example
+    /// ```rust
+    /// use arae::{CurVec, Cursed, Bounded, CursedExt};
+    ///
+    /// let vec: CurVec<_> = vec![1, 2].into();
+    ///
+    /// for (elem, cursor) in vec.wrapping_iter_at(vec.head()) {
+    ///     println!("elem: {}", elem);
+    ///     if vec.is_tail(cursor) {
+    ///         break;
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn wrapping_iter_at(&self, cursor: Cursor<T>) -> WrappingIter<'_, Self, T> {
+        WrappingIter::new(self, cursor)
     }
 }
 
-impl<T> From<Vec<T>> for Ring<T> {
-    fn from(value: Vec<T>) -> Self {
-        value.into_boxed_slice().into()
-    }
-}
+impl<T, U> CursedExt<U> for T where T: Cursed<U> {}
 
-impl<T> From<Box<[T]>> for Ring<T> {
-    fn from(value: Box<[T]>) -> Self {
-        // get the box slice ptr as non-null.
-        let ptr = NonNull::new(value.as_ptr() as _).expect("non-null box ptr");
-        // get the box slice len.
-        let len = value.len();
-        // we are taking control of the data,
-        // prevent the data being dropped.
-        mem::forget(value);
-        // construct the ring from the raw parts.
-        unsafe { Self::from_raw_parts(ptr, len) }
-    }
-}
+#[cfg(feature = "atomic")]
+mod atomic {
+    #[cfg(feature = "loom")]
+    pub use loom::sync::atomic::{AtomicPtr, Ordering};
 
-impl<T> AsRef<[T]> for Ring<T> {
-    fn as_ref(&self) -> &[T] {
-        self.as_slice()
-    }
-}
-
-impl<T> AsMut<[T]> for Ring<T> {
-    fn as_mut(&mut self) -> &mut [T] {
-        self.as_slice_mut()
-    }
-}
-
-impl<T: fmt::Debug> fmt::Debug for Ring<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Ring({:?})", self.as_slice())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Ring;
-    use alloc::vec;
-
-    #[test]
-    fn test_new_ring_with_default() {
-        Ring::<u8>::new_with_default(1);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_new_ring_empty() {
-        Ring::<u8>::new_with_default(0);
-    }
-
-    #[test]
-    fn test_ring_get() {
-        let ring: Ring<_> = vec![1, 2, 3].into();
-        assert_eq!(ring.len(), 3);
-
-        let cursor = ring.head();
-
-        assert_eq!(*ring.get(cursor), 1);
-
-        let cursor = ring.next(cursor);
-        assert_eq!(*ring.get(cursor), 2);
-
-        let cursor = ring.next(cursor);
-        assert_eq!(*ring.get(cursor), 3);
-
-        let cursor = ring.next(cursor);
-        assert_eq!(*ring.get(cursor), 1);
-    }
-
-    #[test]
-    fn test_ring_clone() {
-        let ring: Ring<_> = vec![1, 2, 3].into();
-        let ring_clone = ring.clone();
-        assert_eq!(ring, ring_clone);
-    }
-
-    #[test]
-    fn test_ring_get_mut() {
-        let mut ring: Ring<_> = vec![1, 2, 3].into();
-        *ring.get_mut(ring.head()) = 2;
-        assert_eq!(ring, vec![2, 2, 3].into());
-    }
-
-    #[test]
-    fn test_ring_iter_at_zero() {
-        let ring: Ring<_> = vec![1, 2].into();
-        let mut ring_iter = ring.iter_at(0);
-
-        let (_, cursor) = ring_iter.next().unwrap();
-        assert_eq!(*ring.get(cursor), 1);
-        assert_eq!(ring.offset(cursor), 0);
-
-        let (_, cursor) = ring_iter.next().unwrap();
-        assert_eq!(*ring.get(cursor), 2);
-        assert_eq!(ring.offset(cursor), 1);
-        assert!(ring.is_tail(cursor));
-
-        let (_, cursor) = ring_iter.next().unwrap();
-        assert_eq!(ring.offset(cursor), 0);
-    }
-
-    #[test]
-    fn test_ring_iter_at() {
-        let ring: Ring<_> = vec![1, 2].into();
-        let mut ring_iter = ring.iter_at(1);
-
-        let (_, cursor) = ring_iter.next().unwrap();
-        assert_eq!(*ring.get(cursor), 2);
-        assert_eq!(ring.offset(cursor), 1);
-        assert!(ring.is_tail(cursor));
-
-        let (_, cursor) = ring_iter.next().unwrap();
-        assert_eq!(*ring.get(cursor), 1);
-        assert_eq!(ring.offset(cursor), 0);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_ring_iter_at_invalid() {
-        let ring: Ring<_> = vec![1].into();
-        ring.iter_at(1);
-    }
-
-    #[test]
-    fn test_ring_iter_at_single_elem() {
-        let ring: Ring<_> = vec![1].into();
-        let mut ring_iter = ring.iter();
-
-        let (_, cursor) = ring_iter.next().unwrap();
-        assert_eq!(*ring.get(cursor), 1);
-        assert!(ring.is_head(cursor));
-        assert!(ring.is_tail(cursor));
-
-        let (_, next_cursor) = ring_iter.next().unwrap();
-        assert_eq!(cursor, next_cursor);
-    }
+    #[cfg(not(feature = "loom"))]
+    pub use core::sync::atomic::{AtomicPtr, Ordering};
 }

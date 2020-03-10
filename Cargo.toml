@@ -1,13 +1,13 @@
 [package]
-name = "carousel"
+name = "arae"
 version = "0.1.0"
 authors = ["avitex <theavitex@gmail.com>"]
 edition = "2018"
 categories = ["no-std", "concurrency", "data-structures"]
-description = "A cyclic data structure in contiguous memory"
-documentation = "https://docs.rs/carousel"
-homepage = "https://github.com/avitex/rust-carousel"
-repository = "https://github.com/avitex/rust-carousel"
+description = "Cursed data structures"
+documentation = "https://docs.rs/arae"
+homepage = "https://github.com/avitex/rust-arae"
+repository = "https://github.com/avitex/rust-arae"
 license = "MIT"
 
 [features]

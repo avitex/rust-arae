@@ -1,20 +1,20 @@
-[![Build Status](https://travis-ci.org/avitex/rust-carousel.svg)](https://travis-ci.org/avitex/rust-carousel)
-[![Crate](https://img.shields.io/crates/v/carousel.svg)](https://crates.io/crates/carousel)
-[![Docs](https://docs.rs/carousel/badge.svg)](https://docs.rs/carousel)
+[![Build Status](https://travis-ci.org/avitex/rust-arae.svg)](https://travis-ci.org/avitex/rust-arae)
+[![Crate](https://img.shields.io/crates/v/arae.svg)](https://crates.io/crates/arae)
+[![Docs](https://docs.rs/arae/badge.svg)](https://docs.rs/arae)
 
-# rust-carousel
+# rust-arae
 
-**A cyclic data structure in contiguous memory**  
-Documentation hosted on [docs.rs](https://docs.rs/carousel).
+**Cursed data structures**  
+Documentation hosted on [docs.rs](https://docs.rs/arae).
 
 ```toml
-carousel = "0.1.0"
+arae = "0.1.0"
 ```
 
 ## Example
 
 ```rust
-use carousel::Ring;
+use arae::Ring;
 
 // Create a new `Ring` of length 10 with the elements 
 // initialized via `Default::default`.

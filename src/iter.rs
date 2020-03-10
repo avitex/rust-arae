@@ -1,39 +1,97 @@
-use crate::{Cursor, Ring};
+use crate::{Bounded, CursedExt, Cursor};
 
-/// A `Ring` element `Iterator` that returns a reference to the
+/// A `Cursed` element `Iterator` that returns a reference to the
 /// element and a `Cursor` that points to it.
 #[derive(Debug)]
-pub struct Iter<'a, T> {
-    cur: Cursor<T>,
-    ring: &'a Ring<T>,
+pub struct Iter<'a, C, T> {
+    cursor: Option<Cursor<T>>,
+    cursed: &'a C,
 }
 
-impl<'a, T> Iter<'a, T> {
-    pub(crate) fn new(ring: &'a Ring<T>, cur: Cursor<T>) -> Self {
-        Self { cur, ring }
+impl<'a, C, T> Iter<'a, C, T> {
+    /// Construct a new `Iter`.
+    pub fn new(cursed: &'a C, cursor: Cursor<T>) -> Self {
+        let cursor = Some(cursor);
+        Self { cursed, cursor }
     }
 }
 
-impl<'a, T> Iterator for Iter<'a, T> {
+impl<'a, C, T: 'a> Iterator for Iter<'a, C, T>
+where
+    C: Bounded<T>,
+{
     type Item = (&'a T, Cursor<T>);
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.ring.len(), None)
+        self.cursed.remaining(self.cursed.head())
     }
 
     fn next(&mut self) -> Option<Self::Item> {
-        let curr_cursor = self.cur;
-        self.cur = self.ring.next(curr_cursor);
-        let elem = self.ring.get(curr_cursor);
+        self.cursor.map(|curr_cursor| {
+            self.cursor = self.cursed.next(curr_cursor);
+            let elem = self.cursed.get(curr_cursor);
+            (elem, curr_cursor)
+        })
+    }
+}
+
+impl<'a, C, T: 'a> DoubleEndedIterator for Iter<'a, C, T>
+where
+    C: Bounded<T>,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.cursor.map(|curr_cursor| {
+            self.cursor = self.cursed.prev(curr_cursor);
+            let elem = self.cursed.get(curr_cursor);
+            (elem, curr_cursor)
+        })
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// WrappingIter
+
+/// A `Cursed` element `Iterator` that returns a reference to the
+/// element and a `Cursor` that points to it.
+#[derive(Debug)]
+pub struct WrappingIter<'a, C, T> {
+    cursor: Cursor<T>,
+    cursed: &'a C,
+}
+
+impl<'a, C, T> WrappingIter<'a, C, T> {
+    /// Construct a new `WrappingIter`.
+    pub fn new(cursed: &'a C, cursor: Cursor<T>) -> Self {
+        Self { cursed, cursor }
+    }
+}
+
+impl<'a, C, T: 'a> Iterator for WrappingIter<'a, C, T>
+where
+    C: Bounded<T>,
+{
+    type Item = (&'a T, Cursor<T>);
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.cursed.remaining(self.cursed.head())
+    }
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let curr_cursor = self.cursor;
+        self.cursor = self.cursed.wrapping_next(curr_cursor);
+        let elem = self.cursed.get(curr_cursor);
         Some((elem, curr_cursor))
     }
 }
 
-impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
+impl<'a, C, T: 'a> DoubleEndedIterator for WrappingIter<'a, C, T>
+where
+    C: Bounded<T>,
+{
     fn next_back(&mut self) -> Option<Self::Item> {
-        let curr_cursor = self.cur;
-        self.cur = self.ring.prev(curr_cursor);
-        let elem = self.ring.get(curr_cursor);
+        let curr_cursor = self.cursor;
+        self.cursor = self.cursed.wrapping_prev(curr_cursor);
+        let elem = self.cursed.get(curr_cursor);
         Some((elem, curr_cursor))
     }
 }
