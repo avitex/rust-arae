@@ -6,12 +6,14 @@ pub use self::atomic::AtomicCursor;
 
 use crate::Cursed;
 
-/// An opaque structure that represents a location within a `Cursed` structure.
+/// An structure that represents a location within a [`Cursed`] structure.
 ///
-/// `Cursor`'s are created from and used with initialized their owning `Cursed`
-/// structures, however if the structure is dropped, will point to invalid memory.
+/// A `Cursor` is created from and used with initialized its owning [`Cursed`]
+/// structure, however if the structure is dropped, will point to invalid memory.
 ///
-/// Safety is achieved via `Cursor` validating it's owned by the `Cursed` structure.
+/// Safety is achieved via `Cursor` validating it's owned by the [`Cursed`] structure.
+/// 
+/// [`Cursed`]: trait.Cursed.html
 pub struct Cursor<T> {
     ptr: NonNull<T>,
 }
@@ -88,7 +90,7 @@ impl<T> Cursor<T> {
         self.ptr
     }
 
-    /// Converts the cursor into the atomic variant.
+    /// Converts the cursor into an atomic variant.
     #[cfg(feature = "atomic")]
     #[inline]
     pub fn into_atomic(self) -> AtomicCursor<T> {
@@ -164,7 +166,9 @@ mod atomic {
     use crate::atomic::{AtomicPtr, Ordering};
     use crate::{Bounded, Cursed, CursedExt, Cursor};
 
-    /// An atomic variant of `Cursor`.
+    /// An atomic wrapper around a [`Cursor`].
+    /// 
+    /// [`Cursor`]: struct.Cursor.html
     pub struct AtomicCursor<T> {
         ptr: AtomicPtr<T>,
         marker: PhantomData<T>,

@@ -7,8 +7,8 @@ use alloc::vec::Vec;
 
 use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor};
 
-/// A `CurVec` is heap-allocated, non-resizable sequence of elements in
-/// contiguous memory designed for efficent access via `Cursor`s.
+/// A heap-allocated, fixed-size, array of values in contiguous memory designed 
+/// for efficient access via [`Cursor`]s.
 ///
 /// You can access the elements of a `CurVec` the same way you would a `Vec` or
 /// `Box<[T]>` however it's characteristics are different to what either provide.
@@ -18,7 +18,7 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor};
 /// - **Cannot** be empty.
 /// - **Cannot** contain elements of `mem::size_of() == 0`.
 /// - **Cannot** be resized (and does not have any notion of capacity).
-/// - Stores the starting element pointer (head) and end element pointer (tail)
+/// - Stores the starting element pointer (`head`) and end element pointer (`tail`)
 ///   unlike a `Vec` which stores the first element pointer and length.
 ///
 /// ```rust
@@ -38,12 +38,13 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor};
 /// // Read the value at the element pointed by `read_cursor`.
 /// assert_eq!(*vec.get(read_cursor), 1);
 /// ```
+/// 
+/// [`Cursor`]: struct.Cursor.html
 pub struct CurVec<T> {
     head: NonNull<T>,
     tail: NonNull<T>,
 }
 
-#[allow(clippy::len_without_is_empty)]
 impl<T> CurVec<T> {
     /// Construct a new `CurVec` with a given length and an element
     /// initializer that cannot fail.
@@ -134,14 +135,13 @@ impl<T> CurVec<T> {
     /// Panics if `len` is zero or greater than `isize::max_value()`.
     ///
     /// # Safety
-    /// Has the same safety constraints and notes as [`slice::from_raw_parts`].
+    /// See the safety notes for [`Vec::from_raw_parts`].
     ///
-    /// [`slice::from_raw_parts`]: https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html
+    /// [`Vec::from_raw_parts`]: https://doc.rust-lang.org/std/vec/struct.Vec.html#method.from_raw_parts
     #[inline]
-    pub unsafe fn from_raw_parts(head_ptr: NonNull<T>, len: usize) -> Self {
+    pub unsafe fn from_raw_parts(head: NonNull<T>, len: usize) -> Self {
         assert_ne!(len, 0);
         assert!(len <= isize::max_value() as usize);
-        let head = head_ptr;
         let tail = NonNull::new_unchecked(head.as_ptr().add(len - 1));
         Self { head, tail }
     }
@@ -158,12 +158,18 @@ impl<T> CurVec<T> {
         unsafe { slice::from_raw_parts_mut(self.head.as_ptr(), self.len()) }
     }
 
-    /// Consume `self` into a boxed slice.
+    /// Consume `self` into a `Box<[T]>`.
     #[inline]
     pub fn into_boxed_slice(mut self) -> Box<[T]> {
         let boxed = unsafe { Box::from_raw(self.as_slice_mut()) };
         mem::forget(self);
         boxed
+    }
+
+    /// Consume `self` into a `Vec<T>`.
+    #[inline]
+    pub fn into_vec(self) -> Vec<T> {
+        self.into_boxed_slice().into()
     }
 }
 
@@ -305,137 +311,5 @@ impl<T> AsMut<[T]> for CurVec<T> {
 impl<T: fmt::Debug> fmt::Debug for CurVec<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "CurVec({:?})", self.as_slice())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use alloc::vec;
-
-    #[test]
-    fn test_new_with_default() {
-        CurVec::<u8>::new_with_default(1);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_new_empty() {
-        CurVec::<u8>::new_with_default(0);
-    }
-
-    #[test]
-    fn test_get() {
-        let vec: CurVec<_> = vec![1, 2, 3].into();
-        assert_eq!(vec.len(), 3);
-
-        let cursor = vec.head();
-
-        assert_eq!(*vec.get(cursor), 1);
-
-        let cursor = vec.next(cursor).unwrap();
-        assert_eq!(*vec.get(cursor), 2);
-
-        let cursor = vec.next(cursor).unwrap();
-        assert_eq!(*vec.get(cursor), 3);
-
-        assert_eq!(vec.next(cursor), None);
-    }
-
-    #[test]
-    fn test_clone() {
-        let vec: CurVec<_> = vec![1, 2, 3].into();
-        let vec_clone = vec.clone();
-        assert_eq!(vec, vec_clone);
-    }
-
-    #[test]
-    fn test_get_mut() {
-        let mut vec: CurVec<_> = vec![1, 2, 3].into();
-        *vec.get_mut(vec.head()) = 2;
-        assert_eq!(vec, vec![2, 2, 3].into());
-    }
-
-    #[test]
-    fn test_iter_at_head() {
-        let vec: CurVec<_> = vec![1, 2].into();
-        let mut vec_iter = vec.iter();
-
-        let (_, cursor) = vec_iter.next().unwrap();
-        assert_eq!(*vec.get(cursor), 1);
-        assert_eq!(vec.offset(cursor), 0);
-
-        let (_, cursor) = vec_iter.next().unwrap();
-        assert_eq!(*vec.get(cursor), 2);
-        assert_eq!(vec.offset(cursor), 1);
-        assert!(vec.is_tail(cursor));
-
-        assert_eq!(vec_iter.next(), None);
-    }
-
-    #[test]
-    fn test_iter_at() {
-        let vec: CurVec<_> = vec![1, 2].into();
-        let mut vec_iter = vec.iter_at(vec.at(1).unwrap());
-
-        let (_, cursor) = vec_iter.next().unwrap();
-        assert_eq!(*vec.get(cursor), 2);
-        assert_eq!(vec.offset(cursor), 1);
-        assert!(vec.is_tail(cursor));
-
-        assert_eq!(vec_iter.next(), None);
-    }
-
-    #[test]
-    fn test_wrapping_iter_at_head() {
-        let vec: CurVec<_> = vec![1, 2].into();
-        let mut vec_iter = vec.wrapping_iter();
-
-        let (_, cursor) = vec_iter.next().unwrap();
-        assert_eq!(*vec.get(cursor), 1);
-        assert_eq!(vec.offset(cursor), 0);
-
-        let (_, cursor) = vec_iter.next().unwrap();
-        assert_eq!(*vec.get(cursor), 2);
-        assert_eq!(vec.offset(cursor), 1);
-        assert!(vec.is_tail(cursor));
-
-        let (_, cursor) = vec_iter.next().unwrap();
-        assert_eq!(vec.offset(cursor), 0);
-    }
-
-    #[test]
-    fn test_wrapping_iter_iter_at() {
-        let vec: CurVec<_> = vec![1, 2].into();
-        let mut vec_iter = vec.wrapping_iter_at(vec.at(1).unwrap());
-
-        let (_, cursor) = vec_iter.next().unwrap();
-        assert_eq!(*vec.get(cursor), 2);
-        assert_eq!(vec.offset(cursor), 1);
-        assert!(vec.is_tail(cursor));
-
-        let (_, cursor) = vec_iter.next().unwrap();
-        assert_eq!(*vec.get(cursor), 1);
-        assert_eq!(vec.offset(cursor), 0);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_iter_at_invalid() {
-        let vec: CurVec<_> = vec![1].into();
-        vec.iter_at(vec.at(1).unwrap());
-    }
-
-    #[test]
-    fn test_vec_iter_at_single_elem() {
-        let vec: CurVec<_> = vec![1].into();
-        let mut vec_iter = vec.iter();
-
-        let (_, cursor) = vec_iter.next().unwrap();
-        assert_eq!(*vec.get(cursor), 1);
-        assert!(vec.is_head(cursor));
-        assert!(vec.is_tail(cursor));
-
-        assert_eq!(vec_iter.next(), None);
     }
 }
