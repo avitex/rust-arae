@@ -5,7 +5,7 @@ use core::{fmt, slice};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor};
+use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor, Sequence};
 
 /// A heap-allocated, fixed-size, array of values in contiguous memory designed
 /// for efficient access via [`Cursor`]s.
@@ -182,20 +182,13 @@ impl<T: Default> CurVec<T> {
 }
 
 impl<T> Cursed<T> for CurVec<T> {
-    fn remaining(&self, cursor: Cursor<T>) -> (usize, Option<usize>) {
-        let remaining = if cursor.ptr() == self.head {
-            self.len()
-        } else {
-            self.len() - self.offset(cursor)
-        };
-        (remaining, Some(remaining))
-    }
-
     #[inline]
     fn is_owner(&self, cursor: Cursor<T>) -> bool {
         (self.head..=self.tail).contains(&cursor.ptr())
     }
+}
 
+impl<T> Sequence<T> for CurVec<T> {
     #[inline]
     // NOTE: we assume the cursor given to us is valid and
     // check it after our advance operation (see sanity check).
@@ -224,6 +217,15 @@ impl<T> Cursed<T> for CurVec<T> {
             // Return the reversed cursor.
             Some(prev_cursor)
         }
+    }
+
+    fn remaining(&self, cursor: Cursor<T>) -> (usize, Option<usize>) {
+        let remaining = if cursor.ptr() == self.head {
+            self.len()
+        } else {
+            self.len() - self.offset(cursor)
+        };
+        (remaining, Some(remaining))
     }
 }
 

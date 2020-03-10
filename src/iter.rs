@@ -1,7 +1,10 @@
-use crate::{Bounded, Cursed, CursedExt, Cursor};
+use crate::{Bounded, CursedExt, Cursor, Sequence};
 
-/// A `Cursed` element `Iterator` that returns a reference to the
-/// element and a `Cursor` that points to it.
+/// A [`Sequence`] element `Iterator` that returns a reference to the
+/// element and a [`Cursor`] that points to it.
+///
+/// [`Cursor`]: ../struct.Cursor.html
+/// [`Sequence`]: ../trait.Sequence.html
 #[derive(Debug)]
 pub struct Iter<'a, C, T> {
     cursor: Option<Cursor<T>>,
@@ -18,7 +21,7 @@ impl<'a, C, T> Iter<'a, C, T> {
 
 impl<'a, C, T: 'a> Iterator for Iter<'a, C, T>
 where
-    C: Cursed<T>,
+    C: Sequence<T>,
 {
     type Item = (&'a T, Cursor<T>);
 
@@ -40,7 +43,7 @@ where
 
 impl<'a, C, T: 'a> DoubleEndedIterator for Iter<'a, C, T>
 where
-    C: Cursed<T>,
+    C: Sequence<T>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.cursor.map(|curr_cursor| {
@@ -54,8 +57,11 @@ where
 ///////////////////////////////////////////////////////////////////////////////
 // WrappingIter
 
-/// A never ending `Cursed` element `Iterator` that returns a reference to the
-/// element and a `Cursor` that points to it.
+/// A cyclic [`Bounded`] element `Iterator` that returns a reference to the
+/// element and a [`Cursor`] that points to it.
+///
+/// [`Cursor`]: ../struct.Cursor.html
+/// [`Bounded`]: ../trait.Bounded.html
 #[derive(Debug)]
 pub struct WrappingIter<'a, C, T> {
     cursor: Cursor<T>,

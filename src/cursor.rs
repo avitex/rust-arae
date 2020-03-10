@@ -164,7 +164,7 @@ mod atomic {
     use core::marker::PhantomData;
 
     use crate::atomic::{AtomicPtr, Ordering};
-    use crate::{Bounded, Cursed, CursedExt, Cursor};
+    use crate::{Bounded, CursedExt, Cursor, Sequence};
 
     /// An atomic wrapper around a [`Cursor`].
     ///
@@ -332,7 +332,7 @@ mod atomic {
         #[inline]
         pub fn next<C>(&self, cursed: &C, order: Ordering) -> bool
         where
-            C: Cursed<T>,
+            C: Sequence<T>,
         {
             let (load, store) = Self::load_store_order(order);
             let cursor = self.load(load);
@@ -357,7 +357,7 @@ mod atomic {
         #[inline]
         pub fn prev<C>(&self, cursed: &C, order: Ordering) -> bool
         where
-            C: Cursed<T>,
+            C: Sequence<T>,
         {
             let (load, store) = Self::load_store_order(order);
             let cursor = self.load(load);

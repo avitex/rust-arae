@@ -6,8 +6,8 @@
     rust_2018_idioms
 )]
 
-//! `arae` provides `Cursed`, a trait for types that allow accessing their
-//! elements given a `Cursor` and types built upon it.
+//! `arae` provides `Cursed`, a trait for types that provide the ability to access
+//! their elements given a `Cursor`.
 //!
 //! ## Example
 //! ```rust
@@ -40,49 +40,87 @@ pub use self::vec::CurVec;
 
 use self::iter::{Iter, WrappingIter};
 
-/// `Cursed` types allow accessing their elements via [`Cursor`]s.
+/// `Cursed` types provide the ability to access their elements via [`Cursor`]s.
 ///
 /// [`Cursor`]: struct.Cursor.html
 pub trait Cursed<T> {
-    /// Given a cursor, return the remaining steps as a known lower and
-    /// optional upper bound.
-    fn remaining(&self, cursor: Cursor<T>) -> (usize, Option<usize>);
-
-    /// Returns `true` if the cursor is owned by self, `false` if not.
+    /// Returns `true` if the [`Cursor`] is owned by self, `false` if not.
+    ///
+    /// This check determines whether or not a [`Cursor`] is pointing to valid
+    /// memory, owned by `self` at the time of calling. It does not guarantee
+    /// the owner will be around after the call, so a lot of care must still
+    /// be taken when dereferencing the [`Cursor`].
+    ///
+    /// [`Cursor`]: struct.Cursor.html
     fn is_owner(&self, cursor: Cursor<T>) -> bool;
-
-    /// Given a cursor, return its next element step.
-    ///
-    /// `None` is returned if the cursor provided cannot advance any further.
-    fn next(&self, cursor: Cursor<T>) -> Option<Cursor<T>>;
-
-    /// Given a cursor, return its previous element step.
-    ///
-    /// `None` is returned if the cursor provided cannot reverse any further.
-    fn prev(&self, cursor: Cursor<T>) -> Option<Cursor<T>>;
 }
 
-/// [`Cursed`] types that are `Bounded` know their `head` and `tail` locations.
+/// `Sequence` types are [`Cursed`] types that provide the ability to move forwards
+/// and backwards through their elements.
 ///
 /// [`Cursed`]: trait.Cursed.html
+/// [`Sequence`]: trait.Sequence.html
+pub trait Sequence<T>: Cursed<T> {
+    /// Given a [`Cursor`], return its next element step.
+    ///
+    /// `None` is returned if the cursor provided cannot advance any further.
+    ///
+    /// [`Cursor`]: struct.Cursor.html
+    fn next(&self, cursor: Cursor<T>) -> Option<Cursor<T>>;
+
+    /// Given a [`Cursor`], return its previous element step.
+    ///
+    /// `None` is returned if the cursor provided cannot reverse any further.
+    ///
+    /// [`Cursor`]: struct.Cursor.html
+    fn prev(&self, cursor: Cursor<T>) -> Option<Cursor<T>>;
+
+    /// Given a [`Cursor`], return the bounds of the remaining steps.
+    ///
+    /// Specifically, `remaining()` returns a tuple where the first element is
+    /// the lower bound, and the second element is the upper bound, as a known
+    /// lower and optional upper bound.
+    ///
+    /// # Implementation notes
+    ///
+    /// As with `Iterator::size_hint()`, `remaining()` is primarily intended to
+    /// be used for optimizations such as reserving space for the elements of the
+    /// iterator, but must not be trusted to e.g., omit bounds checks in unsafe code.
+    /// An incorrect implementation of `remaining()` should not lead to memory
+    /// safety violations.
+    ///
+    /// [`Cursor`]: struct.Cursor.html
+    fn remaining(&self, cursor: Cursor<T>) -> (usize, Option<usize>);
+}
+
+/// `Bounded` types are [`Cursed`] [`Sequence`]s that know their `head` and `tail` locations.
+///
+/// [`Cursed`]: trait.Cursed.html
+/// [`Sequence`]: trait.Sequence.html
 #[allow(clippy::len_without_is_empty)]
-pub trait Bounded<T>: Cursed<T> {
+pub trait Bounded<T>: Sequence<T> {
     /// Returns the number of items within the sequence.
     fn len(&self) -> usize;
 
-    /// Returns a cursor pointing to the head of the sequence.
+    /// Returns a [`Cursor`] pointing to the head of the sequence.
+    ///
+    /// [`Cursor`]: struct.Cursor.html
     fn head(&self) -> Cursor<T>;
 
-    /// Returns a cursor pointing to the tail of the sequence.
+    /// Returns a [`Cursor`] pointing to the tail of the sequence.
+    ///
+    /// [`Cursor`]: struct.Cursor.html
     fn tail(&self) -> Cursor<T>;
 
-    /// Returns `Some(Cursor)` at the given offset from the head of the sequence,
+    /// Returns `Some(`[`Cursor`]`)` at the given offset from the head of the sequence,
     /// `None` if the offset is out of bounds.
+    ///
+    /// [`Cursor`]: struct.Cursor.html
     fn at(&self, offset: usize) -> Option<Cursor<T>>;
 }
 
-/// [`Cursed`] types that are `Contiguous` guarantee elements reside right next
-/// to each other in memory (eg `Vec<T>`, `[T]`).
+/// `Contiguous` types are [`Bounded`] [`Sequence`]s that guarantee elements
+/// reside next to each other in memory (ie. `[T]`).
 ///
 /// This trait is `unsafe` as dependencies may implement unsafe behaviour with
 /// this guarantee.
@@ -90,7 +128,8 @@ pub trait Bounded<T>: Cursed<T> {
 /// # Safety
 /// Implementers must ensure all elements reside next to each other in memory.
 ///
-/// [`Cursed`]: trait.Cursed.html
+/// [`Bounded`]: trait.Bounded.html
+/// [`Sequence`]: trait.Sequence.html
 pub unsafe trait Contiguous<T>: Bounded<T> {}
 
 /// Extended functionality for implementations of [`Cursed`].
@@ -279,7 +318,10 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     /// ```
     ///
     /// [`Cursor`]: struct.Cursor.html
-    fn iter_at(&self, cursor: Cursor<T>) -> Iter<'_, Self, T> {
+    fn iter_at(&self, cursor: Cursor<T>) -> Iter<'_, Self, T>
+    where
+        Self: Sequence<T>,
+    {
         Iter::new(self, cursor)
     }
 
@@ -332,7 +374,10 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// [`Cursor`]: struct.Cursor.html
     #[inline]
-    fn wrapping_iter_at(&self, cursor: Cursor<T>) -> WrappingIter<'_, Self, T> {
+    fn wrapping_iter_at(&self, cursor: Cursor<T>) -> WrappingIter<'_, Self, T>
+    where
+        Self: Sequence<T>,
+    {
         WrappingIter::new(self, cursor)
     }
 }
