@@ -125,8 +125,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     /// Panics if self does not own the cursor.
     #[inline]
     fn get_mut(&mut self, cursor: Cursor<T>) -> &mut T {
-        assert!(self.is_owner(cursor));
-        unsafe { &mut *cursor.ptr().as_ptr() }
+        cursor.get_mut(self)
     }
 
     /// Returns `true` if the cursor points to the first element, `false` if not.
