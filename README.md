@@ -14,7 +14,7 @@ arae = "0.1.0"
 ## Example
 
 ```rust
-use arae::{CurVec, Cursed, CursedExt, Bounded};
+use arae::{CurVec, CursedExt, Bounded};
 
 // Create a new `CurVec` of length 10 with the elements 
 // initialized via `Default::default`.
@@ -28,8 +28,3 @@ let read_cursor = vec.head();
 
 assert_eq!(*vec.get(read_cursor), 1);
 ```
-
-## TODO
-
-- Implement `Chain`.
-- Implement `Cursed` for standard structures.
