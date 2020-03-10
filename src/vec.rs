@@ -190,7 +190,7 @@ impl<T: Default> CurVec<T> {
     }
 }
 
-impl<T> Cursed<T> for CurVec<T> {
+unsafe impl<T> Cursed<T> for CurVec<T> {
     #[inline]
     fn is_owner(&self, cursor: Cursor<T>) -> bool {
         (self.head..=self.tail).contains(&cursor.ptr())

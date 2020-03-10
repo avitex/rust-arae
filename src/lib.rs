@@ -42,14 +42,22 @@ use self::iter::{Iter, WrappingIter};
 
 /// `Cursed` types provide the ability to access their elements via [`Cursor`]s.
 ///
+/// ## Safety
+///
+/// See the notes on the single function this trait requires: `is_owner`.
+///
 /// [`Cursor`]: struct.Cursor.html
-pub trait Cursed<T> {
-    /// Returns `true` if the [`Cursor`] is owned by self, `false` if not.
+pub unsafe trait Cursed<T> {
+    /// Returns `true` if the [`Cursor`] is owned by `self`, `false` if not.
     ///
     /// This check determines whether or not a [`Cursor`] is pointing to valid
-    /// memory, owned by `self` at the time of calling. It does not guarantee
-    /// the owner will be around after the call, so a lot of care must still
-    /// be taken when dereferencing the [`Cursor`].
+    /// memory, owned by `self` at the time of calling, and is used when
+    /// dereferencing the [`Cursor`].
+    ///
+    /// The actual operation of checking if the the cursor is owned is not
+    /// `unsafe`, however implementations of this trait **must** ensure the
+    /// [`Cursor`] is pointing to valid memory owned by `self`, and that it
+    /// does not disappear while `self` is alive.
     ///
     /// [`Cursor`]: struct.Cursor.html
     fn is_owner(&self, cursor: Cursor<T>) -> bool;

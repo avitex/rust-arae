@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog][Keep a Changelog] and this project adh
 
 - add `AsCursor`.
 - update `CurVec` documentation.
+- change `Cursed` to be `unsafe`.
 
 ---
 
