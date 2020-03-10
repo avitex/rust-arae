@@ -28,15 +28,10 @@
 
 extern crate alloc;
 
-//#[cfg(feature = "atomic")]
-//mod chain;
 mod cursor;
 /// Iterators for [`Cursed`](trait.Cursed.html) types.
 pub mod iter;
 mod vec;
-
-//#[cfg(feature = "atomic")]
-//pub use self::chain::Chain;
 
 #[cfg(feature = "atomic")]
 pub use self::cursor::AtomicCursor;
