@@ -35,7 +35,7 @@ mod vec;
 
 #[cfg(feature = "atomic")]
 pub use self::cursor::AtomicCursor;
-pub use self::cursor::Cursor;
+pub use self::cursor::{AsCursor, Cursor};
 pub use self::vec::CurVec;
 
 use self::iter::{Iter, WrappingIter};

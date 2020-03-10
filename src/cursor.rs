@@ -159,6 +159,21 @@ impl<T> fmt::Debug for Cursor<T> {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// AsCursor
+
+/// `AsCursor` is for simple [`Cursed`] owners where it makes sense to be able
+/// to return a single [`Cursor`].
+///
+/// [`Cursed`]: trait.Cursed.html
+/// [`Cursor`]: struct.Cursor.html
+pub trait AsCursor<T>: Cursed<T> {
+    /// Return a [`Cursor`] for the owner.
+    ///
+    /// [`Cursor`]: struct.Cursor.html
+    fn as_cursor(&self) -> Cursor<T>;
+}
+
 mod atomic {
     use core::fmt;
     use core::marker::PhantomData;
