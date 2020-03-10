@@ -10,12 +10,12 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor, Sequence};
 /// A heap-allocated, fixed-size, array of values in contiguous memory designed
 /// for efficient access via [`Cursor`]s.
 ///
-/// You can access the elements of a `CurVec` the same way you would a `Vec` or
-/// `Box<[T]>` however it's characteristics are different to what either provide.
-/// Unlike a `Vec` which stores the data ptr, length and capacity a `CurVec` stores 
-/// the starting element ptr (`head`) and end element ptr (`tail`).
+/// You can access the elements of a `CurVec<T>` the same way you would a `Vec<T>`
+/// or `Box<[T]>` however it's characteristics are different to what either provide.
+/// Unlike a `Vec<T>` which stores the data ptr, length and capacity a `CurVec<T>`
+/// stores the starting element ptr (`head`) and end element ptr (`tail`).
 ///
-/// A `CurVec`:
+/// A `CurVec<T>`:
 ///
 /// - **Cannot** be empty.
 /// - **Cannot** contain elements of `mem::size_of() == 0`.
@@ -55,8 +55,8 @@ pub struct CurVec<T> {
 }
 
 impl<T> CurVec<T> {
-    /// Construct a new `CurVec` with a given length and an element
-    /// initializer that cannot fail.
+    /// Construct a new `CurVec` with a given length and an element initializer
+    /// that cannot fail.
     pub fn new_with_init<F>(len: usize, mut init_fn: F) -> Self
     where
         F: FnMut() -> T,
@@ -67,8 +67,8 @@ impl<T> CurVec<T> {
         }
     }
 
-    /// Construct a new `CurVec` with a given length and an element
-    /// initializer that may fail.
+    /// Construct a new `CurVec` with a given length and an element initializer
+    /// that may fail.
     pub fn try_new_with_init<F, E>(len: usize, mut init_fn: F) -> Result<Self, E>
     where
         F: FnMut() -> Result<T, E>,
@@ -183,8 +183,8 @@ impl<T> CurVec<T> {
 }
 
 impl<T: Default> CurVec<T> {
-    /// Construct a new `CurVec` with a given length with elements
-    /// initialized via `Default::default()`.
+    /// Construct a new `CurVec` with a given length with elements initialized 
+    /// via `Default::default()`.
     pub fn new_with_default(len: usize) -> Self {
         Self::new_with_init(len, T::default)
     }
@@ -200,7 +200,7 @@ impl<T> Cursed<T> for CurVec<T> {
 impl<T> Sequence<T> for CurVec<T> {
     #[inline]
     // NOTE: we assume the cursor given to us is valid and
-    // check it after our advance operation (see sanity check).
+    // check it after our forward operation (see sanity check).
     fn next(&self, cursor: Cursor<T>) -> Option<Cursor<T>> {
         if cursor.ptr() == self.tail {
             None
@@ -208,14 +208,14 @@ impl<T> Sequence<T> for CurVec<T> {
             let next_cursor = unsafe { cursor.unchecked_add(1) };
             // Sanity check.
             assert!(self.is_owner(cursor));
-            // Return the advanced cursor.
+            // Return the next cursor.
             Some(next_cursor)
         }
     }
 
     #[inline]
     // NOTE: we assume the cursor given to us is valid and
-    // check it after our advance operation (see sanity check).
+    // check it after our backward operation (see sanity check).
     fn prev(&self, cursor: Cursor<T>) -> Option<Cursor<T>> {
         if cursor.ptr() == self.head {
             None
@@ -223,7 +223,7 @@ impl<T> Sequence<T> for CurVec<T> {
             let prev_cursor = unsafe { cursor.unchecked_sub(1) };
             // Sanity check.
             assert!(self.is_owner(cursor));
-            // Return the reversed cursor.
+            // Return the previous cursor.
             Some(prev_cursor)
         }
     }
@@ -295,14 +295,14 @@ impl<T> From<Vec<T>> for CurVec<T> {
 
 impl<T> From<Box<[T]>> for CurVec<T> {
     fn from(value: Box<[T]>) -> Self {
-        // get the box slice ptr as non-null.
+        // Get the box slice ptr as non-null.
         let ptr = NonNull::new(value.as_ptr() as _).expect("non-null box ptr");
-        // get the box slice len.
+        // Get the box slice len.
         let len = value.len();
-        // we are taking control of the data,
+        // We are taking control of the data to 
         // prevent the data being dropped.
         mem::forget(value);
-        // construct the vec from the raw parts.
+        // Construct the vec from the raw parts.
         unsafe { Self::from_raw_parts(ptr, len) }
     }
 }
