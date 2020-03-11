@@ -6,7 +6,7 @@ mod pointer;
 
 #[cfg(feature = "atomic")]
 pub use self::atomic::AtomicCursorPtr;
-pub use self::handle::{CursorPtrGuard, CursorPtrGuardMut, Handle, HandleMut};
+pub use self::handle::{Handle, HandleMut};
 pub use self::pointer::CursorPtr;
 
 use super::Cursed;

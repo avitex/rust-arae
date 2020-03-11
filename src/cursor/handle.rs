@@ -1,4 +1,3 @@
-use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
 use alloc::rc::Rc;
@@ -28,10 +27,10 @@ use super::{Cursor, CursorPtr};
 /// ```
 pub unsafe trait Handle<'a, T>: Cursor<T> {
     /// Guard type that represents a valid immutable borrow of data.
-    type Guard: Deref<Target = T>;
+    type Guard: Deref<Target = T> + 'a;
 
     /// Returns a new `Self::Guard` available for dereferencing.
-    fn lock_ref(&self) -> Self::Guard;
+    fn lock_ref(&'a self) -> Self::Guard;
 }
 
 /// An extension over a [`Cursor`] type which ensures the data pointed to is
@@ -58,10 +57,10 @@ pub unsafe trait Handle<'a, T>: Cursor<T> {
 /// ```
 pub unsafe trait HandleMut<'a, T>: Handle<'a, T> {
     /// Guard type that represents a valid mutable borrow of data.
-    type GuardMut: DerefMut<Target = T>;
+    type GuardMut: DerefMut<Target = T> + 'a;
 
     /// Returns a new `Self::GuardMut` available for dereferencing.
-    fn lock_mut(&mut self) -> Self::GuardMut;
+    fn lock_mut(&'a mut self) -> Self::GuardMut;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -74,11 +73,11 @@ impl<T> Cursor<T> for Arc<T> {
     }
 }
 
-unsafe impl<'a, T> Handle<'a, T> for Arc<T> {
-    type Guard = CursorPtrGuard<'a, T>;
+unsafe impl<'a, T: 'a> Handle<'a, T> for Arc<T> {
+    type Guard = &'a T;
 
-    fn lock_ref(&self) -> Self::Guard {
-        unsafe { CursorPtrGuard::new(self.as_ptr()) }
+    fn lock_ref(&'a self) -> Self::Guard {
+        &*self
     }
 }
 
@@ -92,83 +91,18 @@ impl<T> Cursor<T> for Rc<T> {
     }
 }
 
-unsafe impl<'a, T> Handle<'a, T> for Rc<T> {
-    type Guard = CursorPtrGuard<'a, T>;
+unsafe impl<'a, T: 'a> Handle<'a, T> for Rc<T> {
+    type Guard = &'a T;
 
-    fn lock_ref(&self) -> Self::Guard {
-        unsafe { CursorPtrGuard::new(self.as_ptr()) }
+    fn lock_ref(&'a self) -> Self::Guard {
+        &*self
     }
 }
 
-unsafe impl<'a, T> HandleMut<'a, T> for Rc<T> {
-    type GuardMut = CursorPtrGuardMut<'a, T>;
+unsafe impl<'a, T: 'a> HandleMut<'a, T> for Rc<T> {
+    type GuardMut = &'a mut T;
 
-    fn lock_mut(&mut self) -> Self::GuardMut {
-        let mut_ref = Rc::get_mut(self).expect("other Rc references exist");
-        unsafe {
-            let ptr = CursorPtr::new_unchecked(mut_ref as _);
-            CursorPtrGuardMut::new(ptr)
-        }
-    }
-}
-
-/// Wrapper around a [`CursorPtr`] with the guarantee that the data it
-/// points to can be safely dereferenced.
-#[derive(Debug)]
-pub struct CursorPtrGuard<'a, T> {
-    ptr: CursorPtr<T>,
-    lifetime: PhantomData<&'a ()>,
-}
-
-impl<'a, T> CursorPtrGuard<'a, T> {
-    unsafe fn new(ptr: CursorPtr<T>) -> Self {
-        Self {
-            ptr,
-            lifetime: PhantomData,
-        }
-    }
-}
-
-impl<'a, T> Deref for CursorPtrGuard<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        // Safe as the constructor of this guard promises
-        // us we can deref the cursor ptr safely.
-        unsafe { &*self.ptr.ptr_mut() }
-    }
-}
-
-/// A mutable variant of [`CursorPtrGuard`].
-#[derive(Debug)]
-pub struct CursorPtrGuardMut<'a, T> {
-    ptr: CursorPtr<T>,
-    lifetime: PhantomData<&'a ()>,
-}
-
-impl<'a, T> CursorPtrGuardMut<'a, T> {
-    unsafe fn new(ptr: CursorPtr<T>) -> Self {
-        Self {
-            ptr,
-            lifetime: PhantomData,
-        }
-    }
-}
-
-impl<'a, T> Deref for CursorPtrGuardMut<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        // Safe as the constructor of this guard promises
-        // us we can deref the cursor ptr safely.
-        unsafe { &*self.ptr.ptr_mut() }
-    }
-}
-
-impl<'a, T> DerefMut for CursorPtrGuardMut<'a, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        // Safe as the constructor of this guard promises
-        // us we can deref the cursor ptr safely.
-        unsafe { &mut *self.ptr.ptr_mut() }
+    fn lock_mut(&'a mut self) -> Self::GuardMut {
+        Rc::get_mut(self).expect("other Rc references exist")
     }
 }
