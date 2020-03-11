@@ -8,6 +8,7 @@
 Documentation hosted on [docs.rs](https://docs.rs/arae).
 
 ```toml
+[dependencies]
 arae = "0.2.0"
 ```
 

@@ -16,3 +16,6 @@ atomic = []
 
 [dependencies]
 loom = { version = "0.2", optional = true }
+
+[dev-dependencies]
+version-sync = "0.8"

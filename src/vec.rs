@@ -5,7 +5,8 @@ use core::{fmt, slice};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor, Sequence};
+use crate::cursor::CursorPtr;
+use crate::{Bounded, Contiguous, Cursed, CursedExt, Sequence};
 
 /// A heap-allocated, fixed-size, array of values in contiguous memory designed
 /// for efficient access via [`Cursor`]s.
@@ -21,14 +22,14 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor, Sequence};
 /// - **Cannot** contain elements of `mem::size_of() == 0`.
 /// - **Cannot** be resized (and does not have any notion of capacity).
 ///
-/// ## Conversion
+/// # Conversion
 ///
 /// - Converting from and into a `Vec<T>` or `Box<[T]>` is a zero-copy operation.
 /// - When converting from a `Vec<T>` excess capacity is stripped.
 /// - Converting from a `Vec<T>`, `Box<[T]>` or similar types will panic if
 ///   their length is zero.
 ///
-/// ## Example
+/// # Example
 ///
 /// ```rust
 /// use arae::{CurVec, CursedExt, Bounded};
@@ -48,7 +49,7 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Cursor, Sequence};
 /// assert_eq!(*vec.get(read_cursor), 1);
 /// ```
 ///
-/// [`Cursor`]: struct.Cursor.html
+/// [`Cursor`]: crate::cursor::Cursor
 pub struct CurVec<T> {
     head: NonNull<T>,
     tail: NonNull<T>,
@@ -191,8 +192,10 @@ impl<T: Default> CurVec<T> {
 }
 
 unsafe impl<T> Cursed<T> for CurVec<T> {
+    type Cursor = CursorPtr<T>;
+
     #[inline]
-    fn is_owner(&self, cursor: Cursor<T>) -> bool {
+    fn is_owner(&self, cursor: &Self::Cursor) -> bool {
         (self.head..=self.tail).contains(&cursor.ptr())
     }
 }
@@ -201,13 +204,13 @@ impl<T> Sequence<T> for CurVec<T> {
     #[inline]
     // NOTE: we assume the cursor given to us is valid and
     // check it after our forward operation (see sanity check).
-    fn next(&self, cursor: Cursor<T>) -> Option<Cursor<T>> {
+    fn next(&self, cursor: Self::Cursor) -> Option<Self::Cursor> {
         if cursor.ptr() == self.tail {
             None
         } else {
             let next_cursor = unsafe { cursor.unchecked_add(1) };
             // Sanity check.
-            assert!(self.is_owner(cursor));
+            assert!(self.is_owner(&cursor));
             // Return the next cursor.
             Some(next_cursor)
         }
@@ -216,19 +219,19 @@ impl<T> Sequence<T> for CurVec<T> {
     #[inline]
     // NOTE: we assume the cursor given to us is valid and
     // check it after our backward operation (see sanity check).
-    fn prev(&self, cursor: Cursor<T>) -> Option<Cursor<T>> {
+    fn prev(&self, cursor: Self::Cursor) -> Option<Self::Cursor> {
         if cursor.ptr() == self.head {
             None
         } else {
             let prev_cursor = unsafe { cursor.unchecked_sub(1) };
             // Sanity check.
-            assert!(self.is_owner(cursor));
+            assert!(self.is_owner(&cursor));
             // Return the previous cursor.
             Some(prev_cursor)
         }
     }
 
-    fn remaining(&self, cursor: Cursor<T>) -> (usize, Option<usize>) {
+    fn remaining(&self, cursor: &Self::Cursor) -> (usize, Option<usize>) {
         let remaining = if cursor.ptr() == self.head {
             self.len()
         } else {
@@ -245,17 +248,17 @@ impl<T> Bounded<T> for CurVec<T> {
     }
 
     #[inline]
-    fn head(&self) -> Cursor<T> {
-        Cursor::new(self.head)
+    fn head(&self) -> Self::Cursor {
+        self.head.into()
     }
 
     #[inline]
-    fn tail(&self) -> Cursor<T> {
-        Cursor::new(self.tail)
+    fn tail(&self) -> Self::Cursor {
+        self.tail.into()
     }
 
     #[inline]
-    fn at(&self, offset: usize) -> Option<Cursor<T>> {
+    fn at(&self, offset: usize) -> Option<Self::Cursor> {
         if offset < self.len() {
             Some(unsafe { self.head().unchecked_add(offset) })
         } else {
