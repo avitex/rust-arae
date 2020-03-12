@@ -35,7 +35,7 @@ where
     C: Bounded<T>,
 {
     pub fn new(data: C) -> Self {
-        let node = Node::<C, T>::new(data);
+        let node = Node::<C, T>::new_solo(data).into_boxed_ptr();
         Self {
             head: NodePtr::new(node),
             tail: NodePtr::new(node),
@@ -43,39 +43,48 @@ where
     }
 
     pub fn push_front(&self, data: C) {
-        // Create a new self referential node.
-        let node = Node::<C, T>::new_self_referential(data);
-        // Safe, as we know we just allocated it.
-        let node_ref = unsafe { node.as_ref() };
+        let node = Node::<C, T>::new_solo(data).into_boxed_ptr();
         // Spin while we attempt to add between the chain head and node it points to.
-        while !Link::for_right_of(&self.head).inject(node) {}
+        unsafe { while !push_boundary_node(&self.head, Boundary::Head, node) {} }
     }
 
     pub fn push_back(&self, data: C) {
-        let node = Node::<C, T>::new_self_referential(data);
-        let node_ref = unsafe { node.as_ref() };
-        // Spin while we attempt to add between the chain tail and node it points to.
-        while !Link::for_left_of(&self.tail).inject(node) {}
+        let node = Node::<C, T>::new_solo(data).into_boxed_ptr();
+        unsafe { while !push_boundary_node(&self.tail, Boundary::Tail, node) {} }
     }
 
-    pub fn ordered_insert(&self, data: C) {
-        let data_head = data.head();
-        let node = Node::<C, T>::new_self_referential(data);
+    pub fn insert_at(&self, at: usize, data: C) {
+        self.insert_at_link_fn(data, |head, tail| Link::at_elem_offset(at, head, tail));
+    }
+
+    pub fn insert_at_node(&self, at: usize, data: C) {
+        self.insert_at_link_fn(data, |head, tail| Link::at_node_offset(at, head, tail));
+    }
+
+    pub fn insert_ordered(&self, data: C) {
+        let at = data.head();
+        self.insert_at_link_fn(data, |head, tail| Link::find_ordered(&at, head, tail));
+    }
+
+    fn insert_at_link_fn<F>(&self, data: C, f: F)
+    where
+        F: for<'a> Fn(&'a Node<C, T>, &'a Node<C, T>) -> Link<'a, C, T>,
+    {
+        let node = Node::<C, T>::new_solo(data).into_boxed_ptr();
         loop {
-            let link = self.ordered_link_for_cursor(data_head, &self.head, &self.tail);
-            if link.inject(node) {
-                return;
+            let head = self
+                .head
+                .load_ref()
+                .expect("boundary node ptr must not be null");
+            let tail = self
+                .tail
+                .load_ref()
+                .expect("boundary node ptr must not be null");
+            let link = f(&head, &tail);
+            if unsafe { link.inject(node) } {
+                break;
             }
         }
-    }
-
-    fn ordered_link_for_cursor<'a>(
-        &self,
-        cursor: C::Cursor,
-        left: &NodePtr<C, T>,
-        right: &NodePtr<C, T>,
-    ) -> Link<'a, C, T> {
-        unimplemented!()
     }
 }
 
@@ -223,35 +232,32 @@ struct Link<'a, C, T> {
     right_current: *mut Node<C, T>,
 }
 
-impl<'a, C, T> Link<'a, C, T> {
-    // fn for_right_of(left: &'a NodePtr<C, T>) -> Self {
+impl<'a, C, T> Link<'a, C, T>
+where
+    C: Bounded<T>,
+{
+    pub fn find_ordered(at: &C::Cursor, left: &'a Node<C, T>, right: &'a Node<C, T>) -> Self {
+        let at = at.as_ptr();
+        unimplemented!()
+    }
+
+    pub fn at_node_offset(at: usize, left: &'a Node<C, T>, right: &'a Node<C, T>) -> Self {
+        unimplemented!()
+    }
+
+    pub fn at_elem_offset(at: usize, left: &'a Node<C, T>, right: &'a Node<C, T>) -> Self {
+        unimplemented!()
+    }
+
+    // fn for_current(left: &'a NodePtr<C, T>, right: &'a NodePtr<C, T>) -> Self {
     //     let left_current = left
     //         .load_non_null()
-    //         .expect("left node in link cannot be null")
+    //         .expect("left ptr for link null")
     //         .as_ptr();
-    //     let left_current_ref = unsafe { &*left_current };
-    //     // NodePtr promises us the node is alive while we have it,
-    //     // this includes the NodePtr owned by the node.
-    //     let right = &left_current_ref.next;
-    //     let right_current = right.load();
-    //     Self {
-    //         left,
-    //         left_current,
-    //         right,
-    //         right_current,
-    //     }
-    // }
-
-    // fn for_left_of(right: &'a NodePtr<C, T>) -> Self {
     //     let right_current = right
     //         .load_non_null()
-    //         .expect("right node in link cannot be null")
+    //         .expect("right ptr for link null")
     //         .as_ptr();
-    //     let right_current_ref = unsafe { &*right_current };
-    //     // NodePtr promises us the node is alive while we have it,
-    //     // this includes the NodePtr owned by the node.
-    //     let left = &right_current_ref.prev;
-    //     let left_current = left.load();
     //     Self {
     //         left,
     //         left_current,
@@ -259,23 +265,6 @@ impl<'a, C, T> Link<'a, C, T> {
     //         right_current,
     //     }
     // }
-
-    fn for_current(left: &'a NodePtr<C, T>, right: &'a NodePtr<C, T>) -> Self {
-        let left_current = left
-            .load_non_null()
-            .expect("left ptr for link null")
-            .as_ptr();
-        let right_current = right
-            .load_non_null()
-            .expect("right ptr for link null")
-            .as_ptr();
-        Self {
-            left,
-            left_current,
-            right,
-            right_current,
-        }
-    }
 
     unsafe fn inject(&self, node: NonNull<Node<C, T>>) -> bool {
         let node_ref = node.as_ref();
@@ -315,6 +304,14 @@ impl<C, T> NodePtr<C, T> {
         }
     }
 
+    fn store(&self, ptr: *mut Node<C, T>) {
+        self.ptr.store(ptr, Ordering::Relaxed);
+    }
+
+    fn excusive_set(&mut self, ptr: *mut Node<C, T>) {
+        *self.ptr.get_mut() = ptr;
+    }
+
     fn load(&self) -> *mut Node<C, T> {
         self.ptr.load(Ordering::Relaxed)
     }
@@ -327,19 +324,11 @@ impl<C, T> NodePtr<C, T> {
         NonNull::new(self.load())
     }
 
-    unsafe fn load_non_null_unchecked(&self) -> NonNull<Node<C, T>> {
-        let ptr = self.load();
-        debug_assert_ne!(ptr, 0);
-        unsafe { NonNull::new_unchecked(ptr) }
-    }
-
-    fn store(&self, ptr: *mut Node<C, T>) {
-        self.ptr.store(ptr, Ordering::SeqCst);
-    }
-
-    fn excusive_set(&mut self, ptr: *mut Node<C, T>) {
-        *self.ptr.get_mut() = ptr;
-    }
+    // unsafe fn load_non_null_unchecked(&self) -> NonNull<Node<C, T>> {
+    //     let ptr = self.load();
+    //     debug_assert_ne!(ptr, 0);
+    //     unsafe { NonNull::new_unchecked(ptr) }
+    // }
 
     // fn take(&self) -> Option<NonNull<Node<C, T>>> {
     //     NonNull::new(self.ptr.swap(0 as _, Ordering::SeqCst))
@@ -347,7 +336,7 @@ impl<C, T> NodePtr<C, T> {
 }
 
 /// The caller must promise no other references to `new_node` exist.
-unsafe fn push_new_node<C, T>(
+unsafe fn push_boundary_node<C, T>(
     boundary: &NodePtr<C, T>,
     to: Boundary,
     new_node: NonNull<Node<C, T>>,
@@ -367,19 +356,18 @@ unsafe fn push_new_node<C, T>(
             current_boundary.next
         }
     };
-    let we_failed_to_change_the_boundary = boundary
-        .ptr
-        .compare_exchange(
-            current_boundary.as_ptr() as _,
-            new_node.as_ptr(),
-            Ordering::Acquire,
-            Ordering::Relaxed,
-        )
-        .is_err();
-    if we_failed_to_change_the_boundary {
+    let boundary_change_result = boundary.ptr.compare_exchange(
+        current_boundary.as_ptr() as _,
+        new_node.as_ptr(),
+        Ordering::Acquire,
+        Ordering::Relaxed,
+    );
+    if boundary_change_result.is_err() {
         return false;
     }
-    boundary_node_null_side.store(new_node.as_ptr());
+    boundary_node_null_side
+        .ptr
+        .store(new_node.as_ptr(), Ordering::Release);
     true
 }
 
