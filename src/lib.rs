@@ -33,10 +33,10 @@ extern crate alloc;
 
 #[cfg(feature = "atomic")]
 mod atomic;
+mod chain;
 pub mod cursor;
 pub mod iter;
 mod vec;
-mod chain;
 
 use core::borrow::Borrow;
 
