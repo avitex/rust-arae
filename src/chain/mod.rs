@@ -9,16 +9,7 @@ enum Boundary {
     Tail,
 }
 
-impl Boundary {
-    fn is_head(self) -> bool {
-        match self {
-            Self::Head => true,
-            Self::Tail => false,
-        }
-    }
-}
-
-/// A `Chain` is a thread safe [`Cursed`] linked list inspired structure
+/// A [`Cursed`] thread safe, linked list inspired structure
 /// where each node contains a [`Cursed`] [`Sequence`].
 ///
 /// [`Cursed`]: trait.Cursed.html

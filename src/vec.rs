@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use crate::cursor::CursorPtr;
 use crate::{Bounded, Contiguous, Cursed, CursedExt, Sequence};
 
-/// A heap-allocated, fixed-size, array of values in contiguous memory designed
+/// A [`Cursed`] heap-allocated, fixed-size, array of values in contiguous memory designed
 /// for efficient access via [`Cursor`]s.
 ///
 /// You can access the elements of a `CurVec<T>` the same way you would a `Vec<T>`
