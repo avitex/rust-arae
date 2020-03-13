@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use core::ptr::NonNull;
 
 use crate::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use crate::{Bounded, Cursed, Cursor, CursorPtr, Sequence};
+use crate::{Bounded, Cursor};
 
 enum Boundary {
     Head,
@@ -88,53 +88,6 @@ where
     }
 }
 
-// impl<C, T> Cursed<T> for Chain<C, T>
-// where
-//     C: Bounded<T>,
-// {
-//     fn is_owner(&self, _cursor: Cursor<T>) -> bool {
-//         unimplemented!()
-//     }
-// }
-
-// impl<C, T> Sequence<T> for Chain<C, T>
-// where
-//     C: Bounded<T>,
-// {
-//     fn next(&self, _cursor: Cursor<T>) -> Option<Cursor<T>> {
-//         unimplemented!()
-//     }
-
-//     fn prev(&self, _cursor: Cursor<T>) -> Option<Cursor<T>> {
-//         unimplemented!()
-//     }
-
-//     fn remaining(&self, _cursor: Cursor<T>) -> (usize, Option<usize>) {
-//         unimplemented!()
-//     }
-// }
-
-// impl<C, T> Bounded<T> for Chain<C, T>
-// where
-//     C: Bounded<T>,
-// {
-//     fn len(&self) -> usize {
-//         unimplemented!()
-//     }
-
-//     fn head(&self) -> Cursor<T> {
-//         unimplemented!()
-//     }
-
-//     fn tail(&self) -> Cursor<T> {
-//         unimplemented!()
-//     }
-
-//     fn at(&self, _offset: usize) -> Option<Cursor<T>> {
-//         unimplemented!()
-//     }
-// }
-
 ///////////////////////////////////////////////////////////////////////////////
 // Node
 
@@ -173,9 +126,10 @@ impl<C, T> Node<C, T> {
     fn new_self_referential(data: C) -> NonNull<Self> {
         let this = Self::new_solo(data);
         let this_ptr = this.into_boxed_ptr();
+        let this_mut = unsafe { &mut *this_ptr.as_ptr() };
         //
-        this_ptr.as_mut().next.excusive_set(this_ptr.as_ptr());
-        this_ptr.as_mut().next.excusive_set(this_ptr.as_ptr());
+        this_mut.prev.excusive_set(this_ptr.as_ptr());
+        this_mut.next.excusive_set(this_ptr.as_ptr());
         //
         this_ptr
     }
@@ -317,7 +271,7 @@ impl<C, T> NodePtr<C, T> {
     }
 
     fn load_ref(&self) -> Option<&Node<C, T>> {
-        self.load().as_ref()
+        unsafe { self.load().as_ref() }
     }
 
     fn load_non_null(&self) -> Option<NonNull<Node<C, T>>> {
@@ -339,7 +293,7 @@ impl<C, T> NodePtr<C, T> {
 unsafe fn push_boundary_node<C, T>(
     boundary: &NodePtr<C, T>,
     to: Boundary,
-    new_node: NonNull<Node<C, T>>,
+    mut new_node: NonNull<Node<C, T>>,
 ) -> bool {
     let current_boundary = boundary
         .load_ref()
@@ -348,12 +302,12 @@ unsafe fn push_boundary_node<C, T>(
         Boundary::Head => {
             let new_node_mut = new_node.as_mut();
             new_node_mut.init_boundary_head(current_boundary.into());
-            current_boundary.prev
+            &current_boundary.prev
         }
         Boundary::Tail => {
-            let new_node_mut = unsafe { new_node.as_mut() };
+            let new_node_mut = new_node.as_mut();
             new_node_mut.init_boundary_tail(current_boundary.into());
-            current_boundary.next
+            &current_boundary.next
         }
     };
     let boundary_change_result = boundary.ptr.compare_exchange(

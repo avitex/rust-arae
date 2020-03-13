@@ -233,9 +233,9 @@ impl<T> Sequence<T> for CurVec<T> {
 
     fn remaining(&self, cursor: &Self::Cursor) -> (usize, Option<usize>) {
         let remaining = if cursor.ptr() == self.head {
-            self.len()
+            self.len() - 1
         } else {
-            self.len() - self.offset(cursor)
+            self.len() - self.offset(cursor) - 1
         };
         (remaining, Some(remaining))
     }

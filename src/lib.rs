@@ -1,13 +1,13 @@
-#![no_std]
-#![doc(html_root_url = "https://docs.rs/arae/0.2.0")]
-#![deny(
-    warnings,
-    missing_docs,
-    missing_debug_implementations,
-    intra_doc_link_resolution_failure,
-    rust_2018_idioms,
-    unreachable_pub
-)]
+// #![no_std]
+// #![doc(html_root_url = "https://docs.rs/arae/0.2.0")]
+// #![deny(
+//     warnings,
+//     missing_docs,
+//     missing_debug_implementations,
+//     intra_doc_link_resolution_failure,
+//     rust_2018_idioms,
+//     unreachable_pub
+// )]
 
 //! `arae` provides [`Cursed`], a trait for types that provide the ability to access
 //! their elements given a [`Cursor`].
@@ -36,6 +36,7 @@ mod atomic;
 mod chain;
 pub mod cursor;
 pub mod iter;
+mod unit;
 mod vec;
 
 use core::borrow::Borrow;
@@ -43,6 +44,7 @@ use core::borrow::Borrow;
 #[cfg(feature = "atomic")]
 pub use self::chain::Chain;
 pub use self::cursor::{Cursor, CursorExt};
+pub use self::unit::Unit;
 pub use self::vec::CurVec;
 
 use self::iter::{Iter, WrappingIter};
@@ -95,6 +97,9 @@ pub trait Sequence<T>: Cursed<T> {
     /// iterator, but must not be trusted to e.g., omit bounds checks in unsafe code.
     /// An incorrect implementation of `remaining()` should not lead to memory
     /// safety violations.
+    ///
+    /// # Panics
+    /// Panics if `self` does not own the [`Cursor`].
     fn remaining(&self, cursor: &Self::Cursor) -> (usize, Option<usize>);
 }
 
@@ -167,6 +172,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     fn get_mut<U>(&mut self, cursor: U) -> &mut T
     where
         U: Borrow<Self::Cursor>,
+        T: 'static,
     {
         cursor.borrow().as_mut_with(self)
     }

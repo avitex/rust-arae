@@ -71,6 +71,7 @@ pub trait CursorExt<T>: Cursor<T> + Sized {
     fn as_mut_with<'a, C: 'a>(&self, cursed: &'a mut C) -> &'a mut T
     where
         C: Cursed<T, Cursor = Self>,
+        T: 'static,
     {
         assert!(cursed.is_owner(self));
         unsafe { &mut *self.as_ptr().ptr_mut() }
