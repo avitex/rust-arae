@@ -20,8 +20,7 @@ where
     C: Cursed<T>,
 {
     /// Construct a new `Iter`.
-    pub fn new(cursed: &'a C, cursor: C::Cursor) -> Self {
-        let cursor = Some(cursor);
+    pub fn new(cursed: &'a C, cursor: Option<C::Cursor>) -> Self {
         Self { cursed, cursor }
     }
 }
@@ -73,7 +72,7 @@ pub struct WrappingIter<'a, C, T>
 where
     C: Cursed<T>,
 {
-    cursor: C::Cursor,
+    cursor: Option<C::Cursor>,
     cursed: &'a C,
 }
 
@@ -82,7 +81,7 @@ where
     C: Cursed<T>,
 {
     /// Construct a new `WrappingIter`.
-    pub fn new(cursed: &'a C, cursor: C::Cursor) -> Self {
+    pub fn new(cursed: &'a C, cursor: Option<C::Cursor>) -> Self {
         Self { cursed, cursor }
     }
 }
@@ -98,10 +97,12 @@ where
     }
 
     fn next(&mut self) -> Option<Self::Item> {
-        let curr_cursor = self.cursor.clone();
-        self.cursor = self.cursed.wrapping_next(curr_cursor.clone());
-        let elem = self.cursed.get(&curr_cursor);
-        Some((elem, curr_cursor))
+        self.cursor.map(|cursor| {
+            let curr_cursor = cursor.clone();
+            self.cursor = Some(self.cursed.wrapping_next(curr_cursor.clone()));
+            let elem = self.cursed.get(&curr_cursor);
+            (elem, curr_cursor)
+        })
     }
 }
 
@@ -110,9 +111,11 @@ where
     C: Bounded<T>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        let curr_cursor = self.cursor.clone();
-        self.cursor = self.cursed.wrapping_prev(curr_cursor.clone());
-        let elem = self.cursed.get(&curr_cursor);
-        Some((elem, curr_cursor))
+        self.cursor.map(|cursor| {
+            let curr_cursor = cursor.clone();
+            self.cursor = Some(self.cursed.wrapping_prev(curr_cursor.clone()));
+            let elem = self.cursed.get(&curr_cursor);
+            (elem, curr_cursor)
+        })
     }
 }

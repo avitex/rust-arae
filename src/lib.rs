@@ -104,15 +104,25 @@ pub trait Sequence<T>: Cursed<T> {
 }
 
 /// `Bounded` types are [`Cursed`] [`Sequence`]s that know their `head` and `tail` locations.
-#[allow(clippy::len_without_is_empty)]
 pub trait Bounded<T>: Sequence<T> {
     /// Returns the number of items within the sequence.
     fn len(&self) -> usize;
 
+    /// Returns `true` if the sequence is empty, `false` if not.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Returns a [`Cursor`] pointing to the head of the sequence.
+    ///
+    /// # Panics
+    /// Implementations may panic if the sequence is empty and cannot return a `head` cursor.
     fn head(&self) -> Self::Cursor;
 
     /// Returns a [`Cursor`] pointing to the tail of the sequence.
+    ///
+    /// # Panics
+    /// Implementations may panic if the sequence is empty and cannot return a `tail` cursor.
     fn tail(&self) -> Self::Cursor;
 
     /// Returns `Some(`[`Cursor`]`)` at the given offset from the head of the sequence,
@@ -177,6 +187,32 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
         cursor.borrow().as_mut_with(self)
     }
 
+    /// Returns the `head` cursor if the sequence is not empty, `None` if it is.
+    #[inline]
+    fn try_head(&self) -> Option<Self::Cursor>
+    where
+        Self: Bounded<T>,
+    {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.head())
+        }
+    }
+
+    /// Returns the `tail` cursor if the sequence is not empty, `None` if it is.
+    #[inline]
+    fn try_tail(&self) -> Option<Self::Cursor>
+    where
+        Self: Bounded<T>,
+    {
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.tail())
+        }
+    }
+
     /// Returns `true` if the [`Cursor`] points at the first element, `false` if not.
     #[inline]
     fn is_head<U>(&self, cursor: U) -> bool
@@ -184,7 +220,11 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
         Self: Bounded<T>,
         U: Borrow<Self::Cursor>,
     {
-        cursor.borrow().as_ptr() == self.head().as_ptr()
+        if self.is_empty() {
+            false
+        } else {
+            cursor.borrow().as_ptr() == self.head().as_ptr()
+        }
     }
 
     /// Returns `true` if the [`Cursor`] points at the last element, `false` if not.
@@ -194,7 +234,11 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
         Self: Bounded<T>,
         U: Borrow<Self::Cursor>,
     {
-        cursor.borrow().as_ptr() == self.tail().as_ptr()
+        if self.is_empty() {
+            false
+        } else {
+            cursor.borrow().as_ptr() == self.tail().as_ptr()
+        }
     }
 
     /// Returns the element offset at the given [`Cursor`].
@@ -294,7 +338,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     where
         Self: Bounded<T>,
     {
-        self.iter_at(self.head())
+        Iter::new(self, self.try_head())
     }
 
     /// Returns a `Iterator<Item = (&T, Cursor<T>)>` that starts at the given [`Cursor`].
@@ -313,7 +357,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     where
         Self: Sequence<T>,
     {
-        Iter::new(self, cursor)
+        Iter::new(self, Some(cursor))
     }
 
     /// Returns a wrapping `Iterator<Item = (&T, Cursor<T>)>` that starts at
@@ -340,7 +384,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     where
         Self: Bounded<T>,
     {
-        self.wrapping_iter_at(self.head())
+        WrappingIter::new(self, self.try_head())
     }
 
     /// Returns a wrapping `Iterator<Item = (&T, Cursor<T>)>` that starts at
@@ -367,7 +411,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     where
         Self: Sequence<T>,
     {
-        WrappingIter::new(self, cursor)
+        WrappingIter::new(self, Some(cursor))
     }
 }
 
