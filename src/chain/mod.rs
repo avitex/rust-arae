@@ -4,7 +4,8 @@ use crate::atomic::Ordering;
 use crate::cursor::{Cursor, CursorPtr};
 use crate::Bounded;
 
-use self::node::{Node, NodePtr};
+use self::node::NodeIter;
+use self::node::{Node, NodePtr, NodeRef};
 
 /// A [`Cursed`] thread safe, linked list inspired structure
 /// where each node contains a [`Cursed`] [`Sequence`].
@@ -31,85 +32,65 @@ where
     }
 
     pub fn push_front(&self, data: C) {
-        Link::inject_fn(data, || {
-            let head_node = self.head_node();
-            let head_node_ptr = head_node.map(Node::as_raw_ptr).unwrap_or(0 as _);
-            let head_node_prev = head_node.map(|n| &n.prev).unwrap_or(&self.tail);
-            Link {
-                left_node: 0 as _,
-                left_next: &self.head,
-                right_node: head_node_ptr,
-                right_prev: head_node_prev,
-            }
-        })
+        Link::inject_fn(data, || Link::new(&self, None, self.head.to_node_ref()))
     }
 
     pub fn push_back(&self, data: C) {
-        Link::inject_fn(data, || {
-            let tail_node = self.tail_node();
-            let tail_node_ptr = tail_node.map(Node::as_raw_ptr).unwrap_or(0 as _);
-            let tail_node_next = tail_node.map(|n| &n.next).unwrap_or(&self.head);
-            Link {
-                left_node: tail_node_ptr,
-                left_next: tail_node_next,
-                right_node: 0 as _,
-                right_prev: &self.tail,
-            }
-        })
+        Link::inject_fn(data, || Link::new(&self, self.tail.to_node_ref(), None))
     }
+
+    // NodeIter::new(left.to_node_ref())
+    //     .flat_map(|node| node.as_ref().data.iter())
+    //     .nth(at)
 
     pub fn insert_at(&self, at: usize, data: C) {
-        Link::inject_fn(data, || Link::at_elem_offset(at, &self.head, &self.tail));
-    }
-
-    pub fn insert_at_node(&self, at: usize, data: C) {
-        Link::inject_fn(data, || Link::at_node_offset(at, &self.head, &self.tail));
+        if at == 0 {
+            self.push_front(data)
+        } else {
+            Link::inject_fn(data, || {
+                let node = NodeIter::new(self.head.to_node_ref()).nth(at).unwrap();
+                Link::with_right_of(&self, Some(node))
+            });
+        }
     }
 
     pub fn insert_ordered(&self, data: C) {
         let at = data.head();
-        Link::inject_fn(data, || Link::find_ordered(&at, &self.head, &self.tail));
-    }
-
-    fn head_node(&self) -> Option<&Node<C, T>> {
-        unsafe { self.head.load(Ordering::Relaxed).as_ref() }
-    }
-
-    fn tail_node(&self) -> Option<&Node<C, T>> {
-        unsafe { self.tail.load(Ordering::Relaxed).as_ref() }
+        Link::inject_fn(data, || {
+            let node = NodeIter::new(self.head.to_node_ref())
+                .find(|node| at.as_ptr() >= node.data().head().as_ptr());
+            Link::with_right_of(&self, node)
+        });
     }
 }
 
 /// A Link represents an attachment between two node pointers at a given time.
 struct Link<'a, C, T> {
-    left_node: *mut Node<C, T>,
-    /// The left to right node pointer.
-    left_next: &'a NodePtr<C, T>,
-    /// Pointer to the right node for this link.
-    right_node: *mut Node<C, T>,
-    /// The right to left node pointer.
-    right_prev: &'a NodePtr<C, T>,
+    chain: &'a Chain<C, T>,
+    left: Option<NodeRef<C, T>>,
+    right: Option<NodeRef<C, T>>,
 }
 
 impl<'a, C: 'a, T: 'a> Link<'a, C, T>
 where
     C: Bounded<T>,
 {
-    pub fn find_ordered(
-        _at: &C::Cursor,
-        _left: &'a NodePtr<C, T>,
-        _right: &'a NodePtr<C, T>,
+    pub fn new(
+        chain: &'a Chain<C, T>,
+        left: Option<NodeRef<C, T>>,
+        right: Option<NodeRef<C, T>>,
     ) -> Self {
-        //let at = at.as_ptr();
-        unimplemented!()
+        Self { chain, left, right }
     }
 
-    pub fn at_node_offset(_at: usize, _left: &'a NodePtr<C, T>, _right: &'a NodePtr<C, T>) -> Self {
-        unimplemented!()
-    }
+    // pub fn with_left_of(chain: &'a Chain<C, T>, right: Option<NodeRef<C, T>>) -> Self {
+    //     let left = right.as_ref().and_then(|right| right.to_prev());
+    //     Self::new(chain, left, right)
+    // }
 
-    pub fn at_elem_offset(_at: usize, _left: &'a NodePtr<C, T>, _right: &'a NodePtr<C, T>) -> Self {
-        unimplemented!()
+    pub fn with_right_of(chain: &'a Chain<C, T>, left: Option<NodeRef<C, T>>) -> Self {
+        let right = left.as_ref().and_then(|left| left.to_next());
+        Self::new(chain, left, right)
     }
 
     fn inject_fn<F>(data: C, mut f: F)
@@ -128,31 +109,32 @@ where
     }
 
     /// Atomically insert a prepared node into the chain.
-    ///
-    /// This operation requires the node was prepared for the given link.
     fn inject(&self, mut new_node: Box<Node<C, T>>) -> Result<(), Box<Node<C, T>>> {
-        new_node.init_next_prev(self.left_node, self.right_node);
+        let (left_ptr, left_next) = match self.left.as_ref() {
+            Some(left) => (left.as_ptr(), &left.as_ref().next),
+            None => (0 as _, &self.chain.head),
+        };
+        let (right_ptr, right_prev) = match self.right.as_ref() {
+            Some(right) => (right.as_ptr(), &right.as_ref().prev),
+            None => (0 as _, &self.chain.tail),
+        };
+        new_node.init_next_prev(left_ptr, right_ptr);
         let new_node = Box::into_raw(new_node);
-        if self
-            .left_next
-            .compare_exchange(
-                self.right_node,
-                new_node,
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            )
+        if left_next
+            .compare_exchange(right_ptr, new_node, Ordering::Acquire, Ordering::Relaxed)
             .is_err()
         {
             let new_node = unsafe { Box::from_raw(new_node) };
             return Err(new_node);
         }
-        self.right_prev.store(new_node, Ordering::Release);
+        right_prev.store(new_node, Ordering::Release);
         Ok(())
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/// A [`Cursor`] for a [`Chain`] structure.
 pub struct ChainCursor<C, T>
 where
     C: Bounded<T>,
@@ -192,7 +174,9 @@ mod tests {
         let chain = Chain::new();
         chain.push_front(Unit(1));
         chain.push_front(Unit(2));
+        chain.push_back(Unit(3));
 
-        assert_eq!(chain.head_node().unwrap().data.0, 2);
+        assert_eq!(chain.head.to_node_ref().unwrap().data().0, 2);
+        assert_eq!(chain.tail.to_node_ref().unwrap().data().0, 3);
     }
 }
