@@ -97,8 +97,7 @@ where
     }
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.cursor.map(|cursor| {
-            let curr_cursor = cursor.clone();
+        self.cursor.clone().map(|curr_cursor| {
             self.cursor = Some(self.cursed.wrapping_next(curr_cursor.clone()));
             let elem = self.cursed.get(&curr_cursor);
             (elem, curr_cursor)
@@ -111,8 +110,7 @@ where
     C: Bounded<T>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.cursor.map(|cursor| {
-            let curr_cursor = cursor.clone();
+        self.cursor.clone().map(|curr_cursor| {
             self.cursor = Some(self.cursed.wrapping_prev(curr_cursor.clone()));
             let elem = self.cursed.get(&curr_cursor);
             (elem, curr_cursor)
