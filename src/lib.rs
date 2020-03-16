@@ -33,7 +33,7 @@ extern crate alloc;
 
 #[cfg(feature = "atomic")]
 mod atomic;
-mod chain;
+pub mod chain;
 pub mod cursor;
 pub mod iter;
 mod unit;
