@@ -33,6 +33,7 @@ extern crate alloc;
 
 #[cfg(feature = "atomic")]
 mod atomic;
+#[cfg(all(feature = "atomic", feature = "untested"))]
 pub mod chain;
 pub mod cursor;
 pub mod iter;
@@ -41,7 +42,7 @@ mod vec;
 
 use core::borrow::Borrow;
 
-#[cfg(feature = "atomic")]
+#[cfg(all(feature = "atomic", feature = "untested"))]
 pub use self::chain::Chain;
 pub use self::cursor::{Cursor, CursorExt};
 pub use self::unit::Unit;
