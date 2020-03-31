@@ -7,6 +7,10 @@
 **Cursed data structures**  
 Documentation hosted on [docs.rs](https://docs.rs/arae).
 
+## Experimental
+
+> **Until otherwise noted, this library is experimental. Unsound issues should be assumed has until fixed and verified.**
+
 ```toml
 [dependencies]
 arae = "0.2.0"
