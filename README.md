@@ -1,3 +1,4 @@
+![Project Status](https://img.shields.io/badge/status-experimental-red)
 [![Build Status](https://travis-ci.org/avitex/rust-arae.svg?branch=master)](https://travis-ci.org/avitex/rust-arae)
 [![Crate](https://img.shields.io/crates/v/arae.svg)](https://crates.io/crates/arae)
 [![Docs](https://docs.rs/arae/badge.svg)](https://docs.rs/arae)
@@ -9,7 +10,7 @@ Documentation hosted on [docs.rs](https://docs.rs/arae).
 
 ## Experimental
 
-> **Until otherwise noted, this library is experimental. Unsound issues should be assumed has until fixed and verified.**
+> **Until otherwise noted, this library is experimental. Unsound issues should be assumed until fixed and verified**
 
 ```toml
 [dependencies]
