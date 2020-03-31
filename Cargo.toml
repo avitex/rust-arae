@@ -15,7 +15,7 @@ maintenance = { status = "experimental" }
 travis-ci = { repository = "avitex/rust-arae", branch = "master" }
 
 [features]
-default = ["atomic"]
+default = ["atomic", "untested"]
 atomic = []
 untested = []
 
