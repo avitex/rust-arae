@@ -21,8 +21,9 @@
 //! let mut vec = CurVec::new_with_default(10);
 //!
 //! // Create two cursors pointing the the head of the vec.
-//! let write_cursor = vec.head();
-//! let read_cursor = vec.head();
+//! let head_cursor = vec.head().unwrap();
+//! let write_cursor = head_cursor.clone();
+//! let read_cursor = head_cursor;
 //!
 //! *vec.get_mut(write_cursor) = 1;
 //!
@@ -115,16 +116,10 @@ pub trait Bounded<T>: Sequence<T> {
     }
 
     /// Returns a [`Cursor`] pointing to the head of the sequence.
-    ///
-    /// # Panics
-    /// Implementations may panic if the sequence is empty and cannot return a `head` cursor.
-    fn head(&self) -> Self::Cursor;
+    fn head(&self) -> Option<Self::Cursor>;
 
     /// Returns a [`Cursor`] pointing to the tail of the sequence.
-    ///
-    /// # Panics
-    /// Implementations may panic if the sequence is empty and cannot return a `tail` cursor.
-    fn tail(&self) -> Self::Cursor;
+    fn tail(&self) -> Option<Self::Cursor>;
 
     /// Returns `Some(`[`Cursor`]`)` at the given offset from the head of the sequence,
     /// `None` if the offset is out of bounds.
@@ -151,7 +146,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// let mut vec: CurVec<_> = vec![0].into();
     ///
-    /// assert_eq!(*vec.get(vec.head()), 0);
+    /// assert_eq!(*vec.get(vec.hptr()), 0);
     /// ```
     ///
     /// # Panics
@@ -172,9 +167,9 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// let mut vec: CurVec<_> = vec![0].into();
     ///
-    /// *vec.get_mut(vec.head()) = 1;
+    /// *vec.get_mut(vec.hptr()) = 1;
     ///
-    /// assert_eq!(*vec.get(vec.head()), 1);
+    /// assert_eq!(*vec.get(vec.hptr()), 1);
     /// ```
     ///
     /// # Panics
@@ -188,32 +183,6 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
         cursor.borrow().as_mut_with(self)
     }
 
-    /// Returns the `head` cursor if the sequence is not empty, `None` if it is.
-    #[inline]
-    fn try_head(&self) -> Option<Self::Cursor>
-    where
-        Self: Bounded<T>,
-    {
-        if self.is_empty() {
-            None
-        } else {
-            Some(self.head())
-        }
-    }
-
-    /// Returns the `tail` cursor if the sequence is not empty, `None` if it is.
-    #[inline]
-    fn try_tail(&self) -> Option<Self::Cursor>
-    where
-        Self: Bounded<T>,
-    {
-        if self.is_empty() {
-            None
-        } else {
-            Some(self.tail())
-        }
-    }
-
     /// Returns `true` if the [`Cursor`] points at the first element, `false` if not.
     #[inline]
     fn is_head<U>(&self, cursor: U) -> bool
@@ -221,10 +190,10 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
         Self: Bounded<T>,
         U: Borrow<Self::Cursor>,
     {
-        if self.is_empty() {
-            false
+        if let Some(head) = self.head() {
+            cursor.borrow().as_ptr() == head.as_ptr()
         } else {
-            cursor.borrow().as_ptr() == self.head().as_ptr()
+            false
         }
     }
 
@@ -235,10 +204,10 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
         Self: Bounded<T>,
         U: Borrow<Self::Cursor>,
     {
-        if self.is_empty() {
-            false
+        if let Some(tail) = self.tail() {
+            cursor.borrow().as_ptr() == tail.as_ptr()
         } else {
-            cursor.borrow().as_ptr() == self.tail().as_ptr()
+            false
         }
     }
 
@@ -251,9 +220,10 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
         Self: Contiguous<T>,
         U: Borrow<Self::Cursor>,
     {
+        let head = self.head().expect("head cursor");
         let cursor = cursor.borrow();
         assert!(self.is_owner(cursor));
-        cursor.as_ptr().offset_from(self.head().as_ptr())
+        cursor.as_ptr().offset_from(head.as_ptr())
     }
 
     /// Given a [`Cursor`], return its next element step.
@@ -267,7 +237,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// let vec: CurVec<_> = vec![1, 2, 3].into();
     ///
-    /// let cursor = vec.wrapping_next(vec.tail());
+    /// let cursor = vec.wrapping_next(vec.tptr());
     ///
     /// assert_eq!(*vec.get(cursor), 1);
     /// ```
@@ -280,7 +250,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
         Self: Bounded<T>,
     {
         if self.is_tail(&cursor) {
-            self.head()
+            self.head().expect("head cursor")
         } else {
             match self.next(cursor) {
                 Some(next_cursor) => next_cursor,
@@ -300,7 +270,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// let vec: CurVec<_> = vec![1, 2, 3].into();
     ///
-    /// let cursor = vec.wrapping_prev(vec.head());
+    /// let cursor = vec.wrapping_prev(vec.hptr());
     ///
     /// assert_eq!(*vec.get(cursor), 3);
     /// ```
@@ -313,7 +283,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
         Self: Bounded<T>,
     {
         if self.is_head(&cursor) {
-            self.tail()
+            self.tail().expect("tail cursor")
         } else {
             match self.prev(cursor) {
                 Some(prev_cursor) => prev_cursor,
@@ -339,7 +309,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     where
         Self: Bounded<T>,
     {
-        Iter::new(self, self.try_head())
+        Iter::new(self, self.head())
     }
 
     /// Returns a `Iterator<Item = (&T, Cursor<T>)>` that starts at the given [`Cursor`].
@@ -350,7 +320,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// let vec: CurVec<_> = vec![1, 2].into();
     ///
-    /// for (elem, cursor) in vec.iter_at(vec.head()) {
+    /// for (elem, cursor) in vec.iter_at(vec.hptr()) {
     ///     println!("elem {} at {:?}:", elem, cursor);
     /// }
     /// ```
@@ -385,7 +355,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     where
         Self: Bounded<T>,
     {
-        WrappingIter::new(self, self.try_head())
+        WrappingIter::new(self, self.head())
     }
 
     /// Returns a wrapping `Iterator<Item = (&T, Cursor<T>)>` that starts at
@@ -400,7 +370,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///
     /// let vec: CurVec<_> = vec![1, 2].into();
     ///
-    /// for (elem, cursor) in vec.wrapping_iter_at(vec.head()) {
+    /// for (elem, cursor) in vec.wrapping_iter_at(vec.head().unwrap()) {
     ///     println!("elem: {}", elem);
     ///     if vec.is_tail(cursor) {
     ///         break;

@@ -9,10 +9,10 @@ documentation = "https://docs.rs/arae"
 homepage = "https://github.com/avitex/rust-arae"
 repository = "https://github.com/avitex/rust-arae"
 license = "MIT"
-maintenance = { status = "experimental" }
 
 [badges]
 travis-ci = { repository = "avitex/rust-arae", branch = "master" }
+maintenance = { status = "experimental" }
 
 [features]
 default = ["atomic", "untested"]

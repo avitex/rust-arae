@@ -28,14 +28,14 @@ impl<C, T> Node<C, T> {
         }
     }
 
-    /// Initialises the node for chain insertion by setting the reference count to `2`.
+    /// Initializes the node for chain insertion by setting the reference count to `2`.
     #[inline]
     pub fn init_insert(mut self) -> Self {
         *self.refs.get_mut() = 2;
         self
     }
 
-    /// Initialises the node's `prev` and `next` node pointers.
+    /// Initializes the node's `prev` and `next` node pointers.
     ///
     /// # Safety
     ///

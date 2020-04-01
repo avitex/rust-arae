@@ -39,8 +39,8 @@ use crate::{Bounded, Contiguous, Cursed, CursedExt, Sequence};
 /// let mut vec = CurVec::new_with_default(10);
 ///
 /// // Create two cursors pointing the the head of the vec.
-/// let write_cursor = vec.head();
-/// let read_cursor = vec.head();
+/// let write_cursor = vec.hptr();
+/// let read_cursor = vec.hptr();
 ///
 /// // Write the value `1` at the element pointed by `write_cursor`.
 /// *vec.get_mut(write_cursor) = 1;
@@ -156,6 +156,18 @@ impl<T> CurVec<T> {
         Self { head, tail }
     }
 
+    /// Return the head pointer.
+    #[inline]
+    pub fn hptr(&self) -> CursorPtr<T> {
+        self.head.into()
+    }
+
+    /// Return the head pointer.
+    #[inline]
+    pub fn tptr(&self) -> CursorPtr<T> {
+        self.tail.into()
+    }
+
     /// Return a slice of the elements.
     #[inline]
     pub fn as_slice(&self) -> &[T] {
@@ -244,23 +256,23 @@ impl<T> Sequence<T> for CurVec<T> {
 impl<T> Bounded<T> for CurVec<T> {
     #[inline]
     fn len(&self) -> usize {
-        self.tail().offset_from(self.head()) + 1
+        self.tptr().offset_from(self.hptr()) + 1
     }
 
     #[inline]
-    fn head(&self) -> Self::Cursor {
-        self.head.into()
+    fn head(&self) -> Option<Self::Cursor> {
+        Some(self.hptr())
     }
 
     #[inline]
-    fn tail(&self) -> Self::Cursor {
-        self.tail.into()
+    fn tail(&self) -> Option<Self::Cursor> {
+        Some(self.tptr())
     }
 
     #[inline]
     fn at(&self, offset: usize) -> Option<Self::Cursor> {
         if offset < self.len() {
-            Some(unsafe { self.head().unchecked_add(offset) })
+            Some(unsafe { self.hptr().unchecked_add(offset) })
         } else {
             None
         }

@@ -27,8 +27,8 @@ use arae::{CurVec, CursedExt, Bounded};
 let mut vec = CurVec::new_with_default(10);
 
 // Create two cursors pointing the the head of the vec.
-let write_cursor = vec.head();
-let read_cursor = vec.head();
+let write_cursor = vec.hptr();
+let read_cursor = vec.hptr();
 
 *vec.get_mut(write_cursor) = 1;
 

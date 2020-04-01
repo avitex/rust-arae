@@ -44,12 +44,12 @@ impl<T> Bounded<T> for Unit<T> {
         1
     }
 
-    fn head(&self) -> Self::Cursor {
-        self.value_ptr()
+    fn head(&self) -> Option<Self::Cursor> {
+        Some(self.value_ptr())
     }
 
-    fn tail(&self) -> Self::Cursor {
-        self.value_ptr()
+    fn tail(&self) -> Option<Self::Cursor> {
+        Some(self.value_ptr())
     }
 
     fn at(&self, offset: usize) -> Option<Self::Cursor> {

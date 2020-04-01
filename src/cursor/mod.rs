@@ -33,7 +33,7 @@ pub trait CursorExt<T>: Cursor<T> + Sized {
     ///
     /// let mut vec: CurVec<_> = vec![0].into();
     ///
-    /// let cursor = vec.head();
+    /// let cursor = vec.hptr();
     ///
     /// assert_eq!(*cursor.as_ref_with(&vec), 0);
     /// ```
@@ -58,7 +58,7 @@ pub trait CursorExt<T>: Cursor<T> + Sized {
     ///
     /// let mut vec: CurVec<_> = vec![0].into();
     ///
-    /// let cursor = vec.head();
+    /// let cursor = vec.hptr();
     ///
     /// *cursor.as_mut_with(&mut vec) = 1;
     ///

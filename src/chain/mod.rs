@@ -12,7 +12,7 @@ use self::node::{AtomicNodePtr, Node, NodeRef};
 ///
 /// [`Cursed`]: trait.Cursed.html
 /// [`Sequence`]: trait.Sequence.html
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Chain<C, T> {
     // The head of the chain sequence.
     head: AtomicNodePtr<C, T>,
@@ -51,12 +51,20 @@ where
     }
 
     pub fn insert_ordered(&self, data: C) {
-        let at = data.head();
-        Link::inject_fn(data, || {
-            let node = NodeIter::new(self.head.to_node_ref())
-                .find(|node| at.as_ptr() >= node.data().head().as_ptr());
-            Link::with_right_of(&self, node)
-        });
+        // Empty nodes end up at the end of the chain
+        if let Some(at) = data.head() {
+            Link::inject_fn(data, || {
+                let node = NodeIter::new(self.head.to_node_ref()).find(|node| {
+                    node.data()
+                        .head()
+                        .map(|head| at.as_ptr() >= head.as_ptr())
+                        .unwrap_or(true)
+                });
+                Link::with_right_of(&self, node)
+            });
+        } else {
+            self.push_back(data)
+        }
     }
 }
 
@@ -137,7 +145,7 @@ pub struct ChainCursor<C, T>
 where
     C: Bounded<T>,
 {
-    node: AtomicNodePtr<C, T>,
+    node: NodeRef<C, T>,
     node_cursor: C::Cursor,
 }
 

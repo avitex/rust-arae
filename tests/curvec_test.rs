@@ -30,7 +30,7 @@ fn test_get() {
     let vec: CurVec<_> = vec![1, 2, 3].into();
     assert_eq!(vec.len(), 3);
 
-    let cursor = vec.head();
+    let cursor = vec.hptr();
 
     assert_eq!(*vec.get(cursor), 1);
 
@@ -46,7 +46,7 @@ fn test_get() {
 #[test]
 fn test_get_mut() {
     let mut vec: CurVec<_> = vec![1, 2, 3].into();
-    *vec.get_mut(vec.head()) = 2;
+    *vec.get_mut(vec.hptr()) = 2;
     assert_eq!(vec, vec![2, 2, 3].into());
 }
 
