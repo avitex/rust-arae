@@ -6,7 +6,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use crate::cursor::CursorPtr;
-use crate::{Bounded, Contiguous, Cursed, CursedExt, Sequence};
+use crate::{Bounded, Contiguous, Cursed, CursedExt, Mutable, Sequence};
 
 /// A [`Cursed`] heap-allocated, fixed-size, array of values in contiguous memory designed
 /// for efficient access via [`Cursor`]s.
@@ -280,6 +280,9 @@ impl<T> Bounded<T> for CurVec<T> {
 }
 
 unsafe impl<T> Contiguous<T> for CurVec<T> {}
+
+// TODO: UNSOUND
+unsafe impl<T> Mutable<T> for CurVec<T> where T: 'static {}
 
 impl<T: Clone> Clone for CurVec<T> {
     fn clone(&self) -> Self {

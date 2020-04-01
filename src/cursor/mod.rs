@@ -2,6 +2,7 @@
 
 mod atomic;
 mod handle;
+mod imp;
 mod pointer;
 
 #[cfg(feature = "atomic")]
@@ -9,7 +10,7 @@ pub use self::atomic::AtomicCursorPtr;
 pub use self::handle::{Handle, HandleMut};
 pub use self::pointer::CursorPtr;
 
-use super::Cursed;
+use super::{Cursed, Mutable};
 
 /// Implemented for types that represent a location within a [`Cursed`] structure.
 ///
@@ -22,8 +23,27 @@ pub trait Cursor<T>: Clone {
     fn as_ptr(&self) -> CursorPtr<T>;
 }
 
+/// A [`Cursor`] that guarantees the data it dereferences to is valid while `self` is.
+///
+/// This guarantee provides the foundation for a referenced counted [`Cursor`],
+/// and operations on a [`Cursor`] without the need to reference the owner.
+///
+/// # Safety
+/// Implementations must guarantee referenced data is valid while `self` is alive,
+/// and that data referenced cannot be mutated without further synchronization.
+pub unsafe trait Detached<T>: Cursor<T> {}
+
 /// Extended functionality for implementations of [`Cursor`].
 pub trait CursorExt<T>: Cursor<T> + Sized {
+    /// Returns a reference to the element the [`Detached`] [`Cursor`] is pointing to.
+    fn as_ref(&self) -> &T
+    where
+        Self: Detached<T>,
+    {
+        // Safe due to the constraints on `Detached`.
+        unsafe { &*self.as_ptr().ptr_mut() }
+    }
+
     /// Returns a reference to the element the `Cursor` is pointing to with
     /// the given owner.
     ///
@@ -70,8 +90,7 @@ pub trait CursorExt<T>: Cursor<T> + Sized {
     #[inline]
     fn as_mut_with<'a, C: 'a>(&self, cursed: &'a mut C) -> &'a mut T
     where
-        C: Cursed<T, Cursor = Self>,
-        T: 'static,
+        C: Mutable<T, Cursor = Self>,
     {
         assert!(cursed.is_owner(self));
         unsafe { &mut *self.as_ptr().ptr_mut() }

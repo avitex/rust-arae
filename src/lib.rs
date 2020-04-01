@@ -22,7 +22,7 @@
 //!
 //! // Create two cursors pointing the the head of the vec.
 //! let head_cursor = vec.head().unwrap();
-//! let write_cursor = head_cursor.clone();
+//! let write_cursor = head_cursor;
 //! let read_cursor = head_cursor;
 //!
 //! *vec.get_mut(write_cursor) = 1;
@@ -54,8 +54,9 @@ use self::iter::{Iter, WrappingIter};
 /// `Cursed` types provide the ability to access their elements via [`Cursor`]s.
 ///
 /// # Safety
-///
-/// See the notes on the single function this trait requires: `is_owner`.
+/// Implementations of this trait **must** guarantee the [`Cursor`] is pointing
+/// to valid memory owned by `self` when returning `true` from [`Cursed::is_owner`],
+/// and that the data referenced does not disappear while `self` is alive.
 pub unsafe trait Cursed<T> {
     /// The [`Cursor`] type this [`Cursed`] type uses.
     type Cursor: Cursor<T>;
@@ -63,13 +64,7 @@ pub unsafe trait Cursed<T> {
     /// Returns `true` if the [`Cursor`] is owned by `self`, `false` if not.
     ///
     /// This check determines whether or not a [`Cursor`] is pointing to valid
-    /// memory, owned by `self` at the time of calling, and is used when
-    /// dereferencing the [`Cursor`].
-    ///
-    /// The actual operation of checking if the the cursor is owned is not
-    /// `unsafe`, however implementations of this trait **must** ensure the
-    /// [`Cursor`] is pointing to valid memory owned by `self`, and that it
-    /// does not disappear while `self` is alive.
+    /// memory, and is used when dereferencing the [`Cursor`].
     fn is_owner(&self, cursor: &Self::Cursor) -> bool;
 }
 
@@ -136,6 +131,14 @@ pub trait Bounded<T>: Sequence<T> {
 /// Implementers must ensure all elements reside next to each other in memory.
 pub unsafe trait Contiguous<T>: Bounded<T> {}
 
+/// `Mutable` types are [`Cursed`] types that allow their elements to be
+/// directly mutated, given a mutable reference to `self`.
+///
+/// # Safety
+/// Implementers must ensure this trait is implemented only for types that can
+/// be safely mutated.
+pub unsafe trait Mutable<T>: Cursed<T> {}
+
 /// Extended functionality for implementations of [`Cursed`].
 pub trait CursedExt<T>: Cursed<T> + Sized {
     /// Returns a reference to the element at the given [`Cursor`].
@@ -177,8 +180,8 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     #[inline]
     fn get_mut<U>(&mut self, cursor: U) -> &mut T
     where
+        Self: Mutable<T>,
         U: Borrow<Self::Cursor>,
-        T: 'static,
     {
         cursor.borrow().as_mut_with(self)
     }

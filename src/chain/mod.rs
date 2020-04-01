@@ -2,7 +2,7 @@ mod node;
 
 use crate::atomic::Ordering;
 use crate::cursor::{Cursor, CursorPtr};
-use crate::Bounded;
+use crate::{Bounded, Cursed, Sequence};
 
 use self::node::NodeIter;
 use self::node::{AtomicNodePtr, Node, NodeRef};
@@ -65,6 +65,60 @@ where
         } else {
             self.push_back(data)
         }
+    }
+}
+
+unsafe impl<C, T> Cursed<T> for Chain<C, T>
+where
+    C: Bounded<T>,
+{
+    type Cursor = ChainCursor<C, T>;
+
+    fn is_owner(&self, _cursor: &Self::Cursor) -> bool {
+        // TODO
+        unimplemented!()
+    }
+}
+
+impl<C, T> Sequence<T> for Chain<C, T>
+where
+    C: Bounded<T>,
+{
+    fn next(&self, cursor: Self::Cursor) -> Option<Self::Cursor> {
+        cursor.next()
+    }
+
+    fn prev(&self, cursor: Self::Cursor) -> Option<Self::Cursor> {
+        cursor.prev()
+    }
+
+    fn remaining(&self, _cursor: &Self::Cursor) -> (usize, Option<usize>) {
+        (0, None)
+    }
+}
+
+impl<C, T> Bounded<T> for Chain<C, T>
+where
+    C: Bounded<T>,
+{
+    fn len(&self) -> usize {
+        unimplemented!()
+    }
+
+    fn is_empty(&self) -> bool {
+        unimplemented!()
+    }
+
+    fn head(&self) -> Option<Self::Cursor> {
+        ChainCursor::from_atomic_ptr(&self.head)
+    }
+
+    fn tail(&self) -> Option<Self::Cursor> {
+        ChainCursor::from_atomic_ptr(&self.tail)
+    }
+
+    fn at(&self, _offset: usize) -> Option<Self::Cursor> {
+        unimplemented!()
     }
 }
 
@@ -147,6 +201,43 @@ where
 {
     node: NodeRef<C, T>,
     node_cursor: C::Cursor,
+}
+
+impl<C, T> ChainCursor<C, T>
+where
+    C: Bounded<T>,
+{
+    fn from_atomic_ptr(node: &AtomicNodePtr<C, T>) -> Option<Self> {
+        node.to_node_ref().and_then(Self::from_node_ref)
+    }
+
+    fn from_node_ref(node: NodeRef<C, T>) -> Option<Self> {
+        node.data()
+            .head()
+            .map(|node_cursor| Self { node, node_cursor })
+    }
+
+    fn next(self) -> Option<Self> {
+        let node = self.node.as_ref();
+        match node.data.next(self.node_cursor) {
+            None => Self::from_atomic_ptr(&node.next),
+            Some(node_cursor) => Some(Self {
+                node_cursor,
+                ..self
+            }),
+        }
+    }
+
+    fn prev(self) -> Option<Self> {
+        let node = self.node.as_ref();
+        match node.data.prev(self.node_cursor) {
+            None => Self::from_atomic_ptr(&node.prev),
+            Some(node_cursor) => Some(Self {
+                node_cursor,
+                ..self
+            }),
+        }
+    }
 }
 
 impl<C, T> Cursor<T> for ChainCursor<C, T>
