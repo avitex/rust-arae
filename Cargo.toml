@@ -23,4 +23,5 @@ untested = []
 loom = { version = "0.2", optional = true }
 
 [dev-dependencies]
+trybuild = "1.0"
 version-sync = "0.8"

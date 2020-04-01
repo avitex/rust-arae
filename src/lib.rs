@@ -327,6 +327,7 @@ pub trait CursedExt<T>: Cursed<T> + Sized {
     ///     println!("elem {} at {:?}:", elem, cursor);
     /// }
     /// ```
+    #[inline]
     fn iter_at(&self, cursor: Self::Cursor) -> Iter<'_, Self, T>
     where
         Self: Sequence<T>,
