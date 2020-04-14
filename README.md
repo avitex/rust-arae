@@ -1,5 +1,5 @@
 ![Project Status](https://img.shields.io/badge/status-experimental-red)
-[![Build Status](https://travis-ci.org/avitex/rust-arae.svg?branch=master)](https://travis-ci.org/avitex/rust-arae)
+[![Build Status](https://travis-ci.com/avitex/rust-arae.svg?branch=master)](https://travis-ci.com/avitex/rust-arae)
 [![Crate](https://img.shields.io/crates/v/arae.svg)](https://crates.io/crates/arae)
 [![Docs](https://docs.rs/arae/badge.svg)](https://docs.rs/arae)
 
