@@ -20,7 +20,7 @@ atomic = []
 untested = []
 
 [dependencies]
-loom = { version = "0.2", optional = true }
+loom = { version = "0.3", optional = true }
 
 [dev-dependencies]
 trybuild = "1.0"
